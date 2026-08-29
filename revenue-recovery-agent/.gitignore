@@ -1,0 +1,11 @@
+# Node / Next.js
+node_modules/
+.next/
+
+# Java / Maven
+target/
+*.class
+.mvn/
+
+# Local H2 database files
+backend/data/
