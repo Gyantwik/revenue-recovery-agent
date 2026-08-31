@@ -3,16 +3,33 @@ import { StatCards } from "@/components/summary/stat-cards"
 import { CauseBreakdown } from "@/components/summary/cause-breakdown"
 import { EscalatedCard } from "@/components/summary/escalated-card"
 import { TransactionTable } from "@/components/transactions/transaction-table"
-import { MOCK_TRANSACTIONS, getSummaryStats, getCauseBreakdown } from "@/lib/mock-data"
+import { getSummaryStats, getCauseBreakdown, type Transaction } from "@/lib/mock-data"
+import { getTransactions } from "@/lib/api"
 import { ShieldCheck, Zap, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
-export default function DashboardPage() {
-  const stats = getSummaryStats(MOCK_TRANSACTIONS)
-  const breakdown = getCauseBreakdown(MOCK_TRANSACTIONS)
+export const dynamic = "force-dynamic"
+
+export default async function DashboardPage() {
+  let transactions: Transaction[] = []
+  let apiError: string | null = null
+
+  try {
+    transactions = await getTransactions()
+  } catch (error) {
+    apiError = error instanceof Error ? error.message : "Unable to load backend data"
+  }
+
+  const stats = getSummaryStats(transactions)
+  const breakdown = getCauseBreakdown(transactions)
 
   return (
     <div className="space-y-8">
+      {apiError && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Backend unavailable: {apiError}. Confirm Spring Boot is running on the configured API URL.
+        </div>
+      )}
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-card border rounded-xl p-6 shadow-xs">
         <div>
@@ -44,7 +61,7 @@ export default function DashboardPage() {
       {/* Cause Breakdown and Escalations */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         <CauseBreakdown breakdown={breakdown} />
-        <EscalatedCard transactions={MOCK_TRANSACTIONS} />
+        <EscalatedCard transactions={transactions} />
       </div>
 
       {/* Recent Activity Snapshot */}
@@ -65,7 +82,7 @@ export default function DashboardPage() {
             View full dataset →
           </Link>
         </div>
-        <TransactionTable initialTransactions={MOCK_TRANSACTIONS} />
+        <TransactionTable initialTransactions={transactions} />
       </div>
     </div>
   )

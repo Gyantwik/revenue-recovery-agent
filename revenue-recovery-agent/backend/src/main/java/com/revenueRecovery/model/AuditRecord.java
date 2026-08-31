@@ -11,6 +11,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -36,6 +38,7 @@ public class AuditRecord {
     @Column(length = 5)
     private String currency;
 
+    @Column(columnDefinition = "TIMESTAMP")
     private Instant timestamp;
 
     @Column(name = "is_at_risk")
@@ -45,6 +48,7 @@ public class AuditRecord {
     private BigDecimal riskAmount;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "root_cause", length = 50)
     private RootCause rootCause;
 
@@ -58,6 +62,7 @@ public class AuditRecord {
     private String policyRuleMatched;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "action_taken", length = 50)
     private ActionTaken actionTaken;
 
@@ -68,6 +73,7 @@ public class AuditRecord {
     private Integer maxAttemptsAllowed;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(length = 30)
     private Outcome outcome;
 

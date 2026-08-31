@@ -36,12 +36,13 @@ public class BatchSummaryService {
         Map<RootCause, CauseAccumulator> byCause = new EnumMap<>(RootCause.class);
         List<BatchSummaryResponse.EscalatedSummary> escalated = new ArrayList<>();
         for (AuditRecord record : records) {
-            byCause.computeIfAbsent(record.getRootCause(), ignored -> new CauseAccumulator())
+            RootCause rootCause = record.getRootCause() == null ? RootCause.UNKNOWN : record.getRootCause();
+            byCause.computeIfAbsent(rootCause, ignored -> new CauseAccumulator())
                     .add(record);
             if (record.getOutcome() == Outcome.ESCALATED) {
                 escalated.add(new BatchSummaryResponse.EscalatedSummary(
                         record.getEventId(),
-                        record.getRootCause(),
+                        rootCause,
                         record.getAmount(),
                         record.getStopOrEscalateReason()));
             }

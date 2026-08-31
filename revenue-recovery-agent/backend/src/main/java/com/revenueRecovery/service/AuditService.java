@@ -11,6 +11,7 @@ import com.revenueRecovery.repository.AuditRecordRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class AuditService {
@@ -50,7 +51,9 @@ public class AuditService {
     }
 
     private String joinSignals(List<String> signals) {
-        return signals == null ? "" : String.join("; ", signals);
+        return signals == null
+                ? ""
+                : signals.stream().filter(Objects::nonNull).collect(java.util.stream.Collectors.joining("; "));
     }
 
     private String stopOrEscalateReason(

@@ -1,12 +1,29 @@
 import React from "react"
 import { TransactionTable } from "@/components/transactions/transaction-table"
-import { MOCK_TRANSACTIONS } from "@/lib/mock-data"
+import { getTransactions } from "@/lib/api"
+import type { Transaction } from "@/lib/mock-data"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
-export default function TransactionsPage() {
+export const dynamic = "force-dynamic"
+
+export default async function TransactionsPage() {
+  let transactions: Transaction[] = []
+  let apiError: string | null = null
+
+  try {
+    transactions = await getTransactions()
+  } catch (error) {
+    apiError = error instanceof Error ? error.message : "Unable to load backend data"
+  }
+
   return (
     <div className="space-y-6">
+      {apiError && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Backend unavailable: {apiError}. Confirm Spring Boot is running on the configured API URL.
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-4">
         <div>
           <div className="flex items-center gap-2">
@@ -26,7 +43,7 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      <TransactionTable initialTransactions={MOCK_TRANSACTIONS} />
+      <TransactionTable initialTransactions={transactions} />
     </div>
   )
 }

@@ -18,6 +18,6 @@ public enum Outcome {
 
     @JsonCreator
     public static Outcome fromJson(String value) {
-        return value == null ? null : valueOf(value.toUpperCase(Locale.ROOT));
+        return value == null ? null : valueOf(value.trim().toUpperCase(Locale.ROOT));
     }
 }

@@ -21,6 +21,6 @@ public enum ActionTaken {
 
     @JsonCreator
     public static ActionTaken fromJson(String value) {
-        return value == null ? null : valueOf(value.toUpperCase(Locale.ROOT));
+        return value == null ? null : valueOf(value.trim().toUpperCase(Locale.ROOT));
     }
 }

@@ -10,6 +10,8 @@ import com.revenueRecovery.repository.EventRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
+
 @Service
 public class RevenueRecoveryPipeline {
 
@@ -39,6 +41,8 @@ public class RevenueRecoveryPipeline {
 
     @Transactional
     public AuditRecord processEvent(Event event) {
+        Objects.requireNonNull(event, "event must not be null");
+        Objects.requireNonNull(event.getEventId(), "eventId must not be null");
         Event normalizedEvent = eventRepository.findByEventId(event.getEventId())
                 .orElseGet(() -> eventRepository.save(event));
 
