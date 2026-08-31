@@ -9,3 +9,6 @@ target/
 
 # Local H2 database files
 backend/data/
+
+# Local source archive
+backend.zip
