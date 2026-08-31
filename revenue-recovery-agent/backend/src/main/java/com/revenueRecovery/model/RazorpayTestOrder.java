@@ -35,7 +35,7 @@ public class RazorpayTestOrder {
     @Column(nullable = false, length = 3)
     private String currency;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 40)
     private String status;
 
     @Column(nullable = false, length = 10)

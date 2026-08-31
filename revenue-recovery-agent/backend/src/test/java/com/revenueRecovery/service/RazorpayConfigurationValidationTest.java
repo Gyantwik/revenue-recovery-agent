@@ -24,6 +24,19 @@ class RazorpayConfigurationValidationTest {
         assertConfigurationRejected("invalid_placeholder");
     }
 
+    @Test
+    void checkoutConfigRejectsLiveKeyId() {
+        RazorpayProperties properties = new RazorpayProperties();
+        properties.setKeyId("rzp_" + "live_placeholder");
+        properties.setKeySecret("safe-unit-placeholder");
+
+        RazorpayTestConfigService service = new RazorpayTestConfigService(properties);
+        RazorpayServiceException exception = assertThrows(RazorpayServiceException.class,
+                service::getCheckoutConfig);
+
+        assertEquals("Razorpay Test Mode is not configured.", exception.getMessage());
+    }
+
     private void assertConfigurationRejected(String keyId) {
         RazorpayProperties properties = new RazorpayProperties();
         properties.setKeyId(keyId);

@@ -1,10 +1,19 @@
-import type { ActionResult, BatchSummary, Transaction } from "@/lib/types"
+import type {
+  ActionResult,
+  BatchSummary,
+  RazorpayCheckoutEvent,
+  RazorpayCheckoutEventRequest,
+  RazorpayTestConfig,
+  RazorpayTestOrder,
+  Transaction,
+} from "@/lib/types"
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080")
   .replace(/\/$/, "")
 
 interface BackendErrorBody {
   error?: string
+  message?: string
   reason?: string
 }
 
@@ -31,6 +40,7 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
     try {
       const body = (await response.json()) as BackendErrorBody
       if (body.reason) message = body.reason
+      else if (body.message) message = body.message
       else if (body.error) message = body.error
     } catch {
       // Keep the status-based message for non-JSON error responses.
@@ -146,4 +156,61 @@ export async function triggerTransactionAction(
 
 export function isTerminalLifecycle(state: Transaction["lifecycle_state"]): boolean {
   return ["recovered", "not_recovered", "stopped", "escalated", "retry_exhausted"].includes(state)
+}
+
+export async function createRazorpayTestOrder(amount: number): Promise<RazorpayTestOrder> {
+  const body = await requestJson("/api/razorpay/test/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount, currency: "INR" }),
+  })
+  if (!isRazorpayTestOrder(body)) throw new ApiError("Backend returned an invalid test order response")
+  return body
+}
+
+export async function getRazorpayTestConfig(): Promise<RazorpayTestConfig> {
+  const body = await requestJson("/api/razorpay/test/config")
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid Razorpay Test Mode configuration")
+  }
+  const config = body as Partial<RazorpayTestConfig>
+  if (typeof config.key_id !== "string" || !config.key_id.startsWith("rzp_test_") || config.mode !== "test") {
+    throw new ApiError("Backend returned an invalid Razorpay Test Mode configuration")
+  }
+  return config as RazorpayTestConfig
+}
+
+export async function recordRazorpayCheckoutEvent(
+  event: RazorpayCheckoutEventRequest,
+): Promise<RazorpayCheckoutEvent> {
+  const body = await requestJson("/api/razorpay/test/checkout-events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(event),
+  })
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid checkout event response")
+  }
+  const result = body as Partial<RazorpayCheckoutEvent>
+  if (typeof result.internal_request_id !== "string"
+    || typeof result.razorpay_order_id !== "string"
+    || (result.razorpay_payment_id != null && typeof result.razorpay_payment_id !== "string")
+    || !["checkout_success", "checkout_failed_or_dismissed"].includes(result.event_type ?? "")
+    || result.status !== "client_reported_unverified"
+    || typeof result.timestamp !== "string") {
+    throw new ApiError("Backend returned an invalid checkout event response")
+  }
+  return result as RazorpayCheckoutEvent
+}
+
+function isRazorpayTestOrder(value: unknown): value is RazorpayTestOrder {
+  if (typeof value !== "object" || value === null) return false
+  const order = value as Partial<RazorpayTestOrder>
+  return typeof order.internal_request_id === "string"
+    && typeof order.razorpay_order_id === "string"
+    && isFiniteNumber(order.amount)
+    && order.currency === "INR"
+    && typeof order.receipt === "string"
+    && order.status === "created"
+    && order.mode === "test"
 }

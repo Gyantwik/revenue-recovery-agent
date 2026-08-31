@@ -77,3 +77,38 @@ export interface BatchSummary {
   by_cause: CauseSummary[]
   escalated_summary: EscalatedSummary[]
 }
+
+export interface RazorpayTestOrder {
+  internal_request_id: string
+  razorpay_order_id: string
+  amount: number
+  currency: "INR"
+  receipt: string
+  status: "created"
+  mode: "test"
+}
+
+export interface RazorpayTestConfig {
+  key_id: string
+  mode: "test"
+}
+
+export type RazorpayCheckoutEventType = "checkout_success" | "checkout_failed_or_dismissed"
+
+export interface RazorpayCheckoutEventRequest {
+  internal_request_id: string
+  razorpay_order_id: string
+  razorpay_payment_id?: string
+  razorpay_signature?: string
+  event_type: RazorpayCheckoutEventType
+  reason?: string
+}
+
+export interface RazorpayCheckoutEvent {
+  internal_request_id: string
+  razorpay_order_id: string
+  razorpay_payment_id?: string
+  event_type: RazorpayCheckoutEventType
+  status: "client_reported_unverified"
+  timestamp: string
+}

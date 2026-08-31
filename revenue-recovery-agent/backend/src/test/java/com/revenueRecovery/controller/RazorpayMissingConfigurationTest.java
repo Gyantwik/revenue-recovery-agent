@@ -34,5 +34,11 @@ class RazorpayMissingConfigurationTest {
         mockMvc.perform(get("/api/batch-summary"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total_cases").value(0));
+
+        mockMvc.perform(get("/api/razorpay/test/config"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("Razorpay unavailable"))
+                .andExpect(jsonPath("$.message").value("Razorpay Test Mode is not configured."))
+                .andExpect(jsonPath("$.status").value(503));
     }
 }

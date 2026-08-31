@@ -1,6 +1,6 @@
 # RecoverAI API Contract
 
-RecoverAI is a synthetic/test-mode demonstration. None of these endpoints initiates a real payment, bank request, mandate debit, or customer message.
+RecoverAI is a synthetic/test-mode demonstration. The Razorpay demo opens Razorpay's sandbox Checkout; no real money moves. Recovery endpoints remain simulations and do not initiate a bank request, mandate debit, or customer message.
 
 The backend listens on `http://localhost:8080` by default. The Next.js server uses that URL unless `NEXT_PUBLIC_API_BASE_URL` overrides it. JSON property names and enum values use lowercase `snake_case`.
 
@@ -41,7 +41,62 @@ Successful mappings are stored separately in `razorpay_test_order` with internal
 
 For local setup, copy `backend/.env.example` to the ignored `backend/.env`, set Test Mode values for the two named variables, and start Spring Boot from `backend/`. No Razorpay configuration is required for the existing synthetic APIs.
 
-This phase creates Razorpay Test Mode orders only. It does not open checkout, verify payments, process a payment, capture money, execute mandate retries, or change recovery metrics.
+`created` means only that the sandbox order exists. The order is not a verified payment.
+
+## GET `/api/razorpay/test/config`
+
+Returns the browser-safe Test Mode Checkout configuration:
+
+```json
+{
+  "key_id": "rzp_test_...",
+  "mode": "test"
+}
+```
+
+Razorpay Standard Checkout expects the Key ID in the browser. This endpoint returns it only when both server credentials are configured and the Key ID starts with `rzp_test_`. It never returns or logs the Key Secret and returns a safe `503` for missing, invalid, or Live Mode configuration.
+
+## POST `/api/razorpay/test/checkout-events`
+
+Temporarily records the browser's unverified Checkout report. A success-shaped request is:
+
+```json
+{
+  "internal_request_id": "req_...",
+  "razorpay_order_id": "order_...",
+  "razorpay_payment_id": "pay_...",
+  "razorpay_signature": "callback_signature",
+  "event_type": "checkout_success"
+}
+```
+
+A dismissal/failure request uses `event_type=checkout_failed_or_dismissed`, omits payment ID and signature, and may include `reason=user_cancelled_or_test_failure`.
+
+The backend checks that the internal request exists, that its stored order ID matches, that the event type and conditional fields are valid, and that a success order/payment pair is not duplicated. Invalid input returns `400`, an unknown internal request returns `404`, and a duplicate success returns `409`.
+
+The response deliberately excludes the signature:
+
+```json
+{
+  "internal_request_id": "req_...",
+  "razorpay_order_id": "order_...",
+  "razorpay_payment_id": "pay_...",
+  "event_type": "checkout_success",
+  "status": "client_reported_unverified",
+  "timestamp": "2026-08-31T00:00:00Z"
+}
+```
+
+Status meanings:
+
+| Status | Meaning |
+| --- | --- |
+| `order_created` | The frontend has received a sandbox order; no Checkout result exists. |
+| `checkout_opened` | Razorpay Test Mode Checkout was opened locally in the browser. |
+| `client_reported_unverified` | The browser reported success, failure, or dismissal; the report is not authenticated or payment-confirming. |
+| Phase 4C verification status | Not implemented. Phase 4C will perform server-side HMAC signature verification. |
+
+The `/razorpay-test` page uses synthetic prefill data, dynamically loads Razorpay-hosted Checkout once, and never collects payment instrument data itself. Neither the callback nor the intake row marks anything paid, captured, settled, verified, or recovered. Checkout orders and attempts are separate from the recovery pipeline, batch totals, and recovery audit history.
 
 ## Shared transaction response
 

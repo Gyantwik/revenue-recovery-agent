@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ShieldCheck, RefreshCw, Activity, ArrowRightLeft } from "lucide-react"
+import { ShieldCheck, Activity, ArrowRightLeft, CreditCard } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function SiteNav() {
@@ -12,6 +12,7 @@ export function SiteNav() {
   const navItems = [
     { href: "/", label: "Recovery Overview", icon: Activity },
     { href: "/transactions", label: "All Transactions", icon: ArrowRightLeft },
+    { href: "/razorpay-test", label: "Test Checkout", icon: CreditCard },
   ]
 
   return (
