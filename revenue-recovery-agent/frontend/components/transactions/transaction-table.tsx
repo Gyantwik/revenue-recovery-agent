@@ -11,9 +11,10 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { StatusBadge, CauseBadge } from "@/components/status-badge"
-import { Transaction } from "@/lib/mock-data"
+import type { Transaction } from "@/lib/types"
 import { ACTION_LABELS, CASE_TYPE_LABELS } from "@/lib/labels"
-import { formatCurrency } from "@/lib/utils"
+import { formatAttemptCount, formatCurrency } from "@/lib/utils"
+import { filterTransactions } from "@/lib/transaction-filter"
 import { TransactionDetailDialog } from "./transaction-detail-dialog"
 import { Search, ChevronRight } from "lucide-react"
 
@@ -34,29 +35,20 @@ export function TransactionTable({
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const filteredTransactions = useMemo(() => {
-    return initialTransactions.filter((txn) => {
-      // Search
-      const matchesSearch =
-        searchTerm === "" ||
-        txn.event_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        txn.policy_rule_matched.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        txn.signals_used.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
-
-      // Cause
-      const matchesCause =
-        selectedCause === "all" || txn.root_cause === selectedCause
-
-      // Outcome
-      const matchesOutcome =
-        selectedOutcome === "all" || txn.outcome === selectedOutcome
-
-      // Case Type
-      const matchesCaseType =
-        selectedCaseType === "all" || txn.case_type === selectedCaseType
-
-      return matchesSearch && matchesCause && matchesOutcome && matchesCaseType
+    return filterTransactions(initialTransactions, {
+      searchTerm,
+      caseType: selectedCaseType,
+      rootCause: selectedCause,
+      outcome: selectedOutcome,
     })
   }, [initialTransactions, searchTerm, selectedCause, selectedOutcome, selectedCaseType])
+
+  const resetFilters = () => {
+    setSearchTerm("")
+    setSelectedCause("all")
+    setSelectedOutcome("all")
+    setSelectedCaseType("all")
+  }
 
   const handleRowClick = (txn: Transaction) => {
     setSelectedTxn(txn)
@@ -75,6 +67,7 @@ export function TransactionTable({
     { value: "incorrect_pin", label: "Incorrect PIN" },
     { value: "merchant_gateway_issue", label: "Merchant / Gateway Issue" },
     { value: "mandate_expired", label: "Mandate Expired / Revoked" },
+    { value: "unknown", label: "Unknown / Manual Review" },
   ]
 
   const outcomesList: { value: string; label: string }[] = [
@@ -150,12 +143,7 @@ export function TransactionTable({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setSearchTerm("")
-                setSelectedCause("all")
-                setSelectedOutcome("all")
-                setSelectedCaseType("all")
-              }}
+              onClick={resetFilters}
               className="text-xs h-9 px-2 text-muted-foreground hover:text-foreground"
             >
               Reset
@@ -205,9 +193,8 @@ export function TransactionTable({
                   <TableCell>
                     <div className="flex items-center gap-1 text-xs font-semibold">
                       <span className={txn.attempt_number >= txn.max_attempts_allowed && txn.max_attempts_allowed > 0 ? "text-amber-600 font-bold" : "text-foreground"}>
-                        {txn.attempt_number}
+                        {formatAttemptCount(txn.attempt_number, txn.max_attempts_allowed)}
                       </span>
-                      <span className="text-muted-foreground">/{txn.max_attempts_allowed}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -232,7 +219,10 @@ export function TransactionTable({
               {filteredTransactions.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="h-32 text-center text-muted-foreground text-sm">
-                    No transactions match your search/filter criteria.
+                    <p>No transactions match your search/filter criteria.</p>
+                    <Button variant="outline" size="sm" className="mt-3" onClick={resetFilters}>
+                      Reset filters
+                    </Button>
                   </TableCell>
                 </TableRow>
               )}

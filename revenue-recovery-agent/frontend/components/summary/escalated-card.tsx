@@ -1,18 +1,16 @@
 import React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Transaction } from "@/lib/mock-data"
-import { CauseBadge, StatusBadge } from "@/components/status-badge"
-import { formatCurrency, formatDateTime } from "@/lib/utils"
+import type { EscalatedSummary } from "@/lib/types"
+import { CauseBadge } from "@/components/status-badge"
+import { formatCurrency } from "@/lib/utils"
 import { AlertTriangle, ArrowRight } from "lucide-react"
 import Link from "next/link"
 
 interface EscalatedCardProps {
-  transactions: Transaction[]
+  escalated: EscalatedSummary[]
 }
 
-export function EscalatedCard({ transactions }: EscalatedCardProps) {
-  const escalated = transactions.filter(t => t.outcome === "escalated")
-
+export function EscalatedCard({ escalated }: EscalatedCardProps) {
   return (
     <Card className="col-span-full xl:col-span-4 shadow-xs border-amber-200/60 dark:border-amber-900/40 bg-gradient-to-b from-amber-50/10 to-transparent">
       <CardHeader className="pb-3">
@@ -32,32 +30,35 @@ export function EscalatedCard({ transactions }: EscalatedCardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
-          {escalated.slice(0, 5).map((txn) => (
-            <div
-              key={txn.event_id}
+          {escalated.slice(0, 5).map((item) => (
+            <Link
+              key={item.event_id}
+              href={`/transactions/${encodeURIComponent(item.event_id)}`}
               className="p-3 rounded-lg border bg-card/60 hover:bg-card transition-colors flex flex-col gap-1.5"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="font-mono text-xs font-bold text-foreground">{txn.event_id}</span>
-                  <span className="text-xs text-muted-foreground block capitalize">{txn.case_type.replace('_', ' ')}</span>
+                  <span className="font-mono text-xs font-bold text-foreground">{item.event_id}</span>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-foreground">{formatCurrency(txn.amount)}</p>
-                  <span className="text-[11px] text-muted-foreground">Conf: {(txn.classification_confidence * 100).toFixed(0)}%</span>
+                  <p className="text-sm font-bold text-foreground">{formatCurrency(item.amount)}</p>
                 </div>
               </div>
 
               <div className="pt-1 border-t border-dashed space-y-1">
                 <div className="flex items-center justify-between">
-                  <CauseBadge cause={txn.root_cause} className="text-[10px] py-0" />
+                  <CauseBadge cause={item.root_cause} className="text-[10px] py-0" />
                   <span className="text-[11px] text-amber-700 dark:text-amber-400 font-medium truncate max-w-[180px]">
-                    {txn.stop_or_escalate_reason || txn.policy_rule_matched}
+                    {item.stop_or_escalate_reason || "Manual review required"}
                   </span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
+
+          {escalated.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">No manual reviews required</p>
+          )}
 
           <div className="pt-2">
             <Link

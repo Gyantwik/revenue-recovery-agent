@@ -2,15 +2,16 @@ import React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { CauseBadge } from "@/components/status-badge"
-import { CauseBreakdownItem } from "@/lib/mock-data"
+import { ROOT_CAUSE_CONFIG } from "@/lib/labels"
+import type { CauseSummary } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 import { ShieldAlert } from "lucide-react"
 
 interface CauseBreakdownProps {
-  breakdown: CauseBreakdownItem[]
+  causes: CauseSummary[]
 }
 
-export function CauseBreakdown({ breakdown }: CauseBreakdownProps) {
+export function CauseBreakdown({ causes }: CauseBreakdownProps) {
   return (
     <Card className="col-span-full xl:col-span-8 shadow-xs">
       <CardHeader className="pb-3">
@@ -40,13 +41,17 @@ export function CauseBreakdown({ breakdown }: CauseBreakdownProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {breakdown.map((item) => (
+              {causes.map((item) => {
+                const recoveryRate = item.total_amount > 0
+                  ? (item.recovered_amount / item.total_amount) * 100
+                  : 0
+                return (
                 <TableRow key={item.root_cause} className="hover:bg-muted/30">
                   <TableCell className="font-medium">
                     <CauseBadge cause={item.root_cause} />
                   </TableCell>
                   <TableCell className="text-right font-semibold text-sm">
-                    {item.total_count}
+                    {item.count}
                   </TableCell>
                   <TableCell className="text-right text-sm font-medium text-muted-foreground">
                     {formatCurrency(item.total_amount)}
@@ -59,19 +64,20 @@ export function CauseBreakdown({ breakdown }: CauseBreakdownProps) {
                       <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-emerald-500 rounded-full"
-                          style={{ width: `${Math.min(item.recovery_rate, 100)}%` }}
+                          style={{ width: `${Math.min(recoveryRate, 100)}%` }}
                         />
                       </div>
                       <span className="text-xs font-semibold text-muted-foreground min-w-[34px]">
-                        {item.recovery_rate.toFixed(0)}%
+                        {recoveryRate.toFixed(0)}%
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground max-w-[280px] truncate" title={item.policy}>
-                    {item.policy}
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground max-w-[280px] truncate" title={ROOT_CAUSE_CONFIG[item.root_cause].standardPolicy}>
+                    {ROOT_CAUSE_CONFIG[item.root_cause].standardPolicy}
                   </TableCell>
                 </TableRow>
-              ))}
+                )
+              })}
             </TableBody>
           </Table>
         </div>

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { StatusBadge, CauseBadge } from "@/components/status-badge"
-import { Transaction } from "@/lib/mock-data"
+import type { Transaction } from "@/lib/types"
 import { ACTION_LABELS, CASE_TYPE_LABELS } from "@/lib/labels"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
 import {
@@ -68,6 +68,11 @@ export function TransactionDetailDialog({
                   Recovered: {formatCurrency(transaction.recovered_amount, transaction.currency)}
                 </span>
               )}
+              {transaction.recovered_amount === 0 && (
+                <span className="text-xs text-muted-foreground block">
+                  Recovered: {formatCurrency(0, transaction.currency)}
+                </span>
+              )}
             </div>
           </div>
         </DialogHeader>
@@ -96,6 +101,9 @@ export function TransactionDetailDialog({
                 Matched Policy: <strong>{transaction.policy_rule_matched}</strong>
               </span>
             </div>
+            <p className="text-xs text-muted-foreground">
+              At risk: <strong>{transaction.is_at_risk ? "Yes" : "No"}</strong>
+            </p>
           </div>
 
           {/* Signals Used */}
@@ -112,6 +120,9 @@ export function TransactionDetailDialog({
                   {signal}
                 </span>
               ))}
+              {transaction.signals_used.length === 0 && (
+                <span className="text-xs text-muted-foreground">No signals recorded</span>
+              )}
             </div>
           </div>
 
@@ -131,7 +142,7 @@ export function TransactionDetailDialog({
               <div className="p-2.5 rounded bg-muted/30 border">
                 <span className="text-muted-foreground block text-[11px]">Attempts Made / Max:</span>
                 <span className="font-bold text-foreground text-sm">
-                  {transaction.attempt_number} of max {transaction.max_attempts_allowed}
+                  {transaction.attempt_number}/{transaction.max_attempts_allowed}
                 </span>
               </div>
               <div className="p-2.5 rounded bg-muted/30 border">

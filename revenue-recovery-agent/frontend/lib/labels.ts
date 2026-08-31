@@ -9,6 +9,7 @@ export type RootCause =
   | "merchant_gateway_issue"
   | "mandate_expired"
   | "mandate_failed_retryable"
+  | "unknown"
 
 export type TransactionOutcome =
   | "recovered"
@@ -118,6 +119,14 @@ export const ROOT_CAUSE_CONFIG: Record<RootCause, RootCauseMeta> = {
     badgeVariant: "secondary",
     standardPolicy: "Mandate failed retryable → Retry, max 2",
     defaultMaxAttempts: 2,
+  },
+  unknown: {
+    label: "Unknown / Manual Review",
+    description: "Classification confidence was too low for an automated action. Manual review is required.",
+    color: "text-gray-700 bg-gray-100 border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700",
+    badgeVariant: "outline",
+    standardPolicy: "Low confidence -> Manual Review",
+    defaultMaxAttempts: 0,
   },
 }
 

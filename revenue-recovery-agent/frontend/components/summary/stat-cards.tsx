@@ -1,14 +1,18 @@
 import React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatCurrency } from "@/lib/utils"
-import { RecoverySummaryStats } from "@/lib/mock-data"
+import { formatCurrency, formatRecoveryRate } from "@/lib/utils"
+import type { BatchSummary, Transaction } from "@/lib/types"
 import { TrendingUp, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react"
 
 interface StatCardsProps {
-  stats: RecoverySummaryStats
+  summary: BatchSummary
+  transactions: Transaction[]
 }
 
-export function StatCards({ stats }: StatCardsProps) {
+export function StatCards({ summary, transactions }: StatCardsProps) {
+  const recoveredCount = transactions.filter(transaction => transaction.outcome === "recovered").length
+  const stoppedCount = transactions.filter(transaction => transaction.outcome === "stopped_correctly").length
+  const escalatedAmount = summary.escalated_summary.reduce((total, item) => total + item.amount, 0)
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {/* 1. At-Risk Revenue */}
@@ -23,10 +27,10 @@ export function StatCards({ stats }: StatCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tracking-tight text-foreground">
-            {formatCurrency(stats.total_at_risk_amount)}
+            {formatCurrency(summary.total_at_risk)}
           </div>
           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
-            <span className="font-medium text-foreground">{stats.total_events}</span> total failure events evaluated
+            <span className="font-medium text-foreground">{summary.total_cases}</span> total failure events evaluated
           </p>
         </CardContent>
       </Card>
@@ -43,14 +47,14 @@ export function StatCards({ stats }: StatCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
-            {formatCurrency(stats.total_recovered_amount)}
+            {formatCurrency(summary.total_recovered)}
           </div>
           <div className="flex items-center gap-2 mt-1">
             <div className="flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <TrendingUp className="h-3.5 w-3.5 mr-0.5" />
-              {stats.overall_recovery_rate.toFixed(1)}% Recovery Rate
+              {formatRecoveryRate(summary.recovery_rate)} Recovery Rate
             </div>
-            <span className="text-xs text-muted-foreground">({stats.recovered_count} txns)</span>
+            <span className="text-xs text-muted-foreground">({recoveredCount} txns)</span>
           </div>
         </CardContent>
       </Card>
@@ -67,7 +71,7 @@ export function StatCards({ stats }: StatCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tracking-tight text-blue-700 dark:text-blue-400">
-            {stats.stopped_correctly_count} Events
+            {stoppedCount} Events
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             Zero unlawful retries (PIN & User Cancelled)
@@ -87,10 +91,10 @@ export function StatCards({ stats }: StatCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tracking-tight text-amber-700 dark:text-amber-400">
-            {formatCurrency(stats.escalated_amount)}
+            {formatCurrency(escalatedAmount)}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            <span className="font-medium text-foreground">{stats.escalated_count}</span> cases routed to manual review
+            <span className="font-medium text-foreground">{summary.escalated_summary.length}</span> cases routed to manual review
           </p>
         </CardContent>
       </Card>

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test": "node --test --experimental-strip-types lib/contract-utils.test.ts lib/api.test.ts",
     "start": "next start",
     "lint": "next lint"
   },
