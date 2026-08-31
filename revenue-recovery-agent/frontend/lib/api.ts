@@ -5,6 +5,8 @@ import type {
   RazorpayCheckoutEventRequest,
   RazorpayTestConfig,
   RazorpayTestOrder,
+  RazorpayPaymentVerification,
+  RazorpayPaymentVerificationRequest,
   Transaction,
 } from "@/lib/types"
 
@@ -213,4 +215,27 @@ function isRazorpayTestOrder(value: unknown): value is RazorpayTestOrder {
     && typeof order.receipt === "string"
     && order.status === "created"
     && order.mode === "test"
+}
+
+export async function verifyRazorpayTestPayment(
+  request: RazorpayPaymentVerificationRequest,
+): Promise<RazorpayPaymentVerification> {
+  const body = await requestJson("/api/razorpay/test/verify-payment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  })
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid verification response")
+  }
+  const result = body as Partial<RazorpayPaymentVerification>
+  if (typeof result.internal_request_id !== "string"
+    || typeof result.razorpay_order_id !== "string"
+    || typeof result.razorpay_payment_id !== "string"
+    || result.verification_status !== "verified_test_payment"
+    || result.mode !== "test"
+    || typeof result.verified_at !== "string") {
+    throw new ApiError("Backend returned an invalid verification response")
+  }
+  return result as RazorpayPaymentVerification
 }

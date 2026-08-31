@@ -44,6 +44,12 @@ public class RazorpayTestCheckoutAttempt {
     @Column(name = "created_at", nullable = false, columnDefinition = "TIMESTAMP")
     private Instant createdAt;
 
+    @Column(name = "verified_at", columnDefinition = "TIMESTAMP")
+    private Instant verifiedAt;
+
+    @Column(name = "verification_failure_code", length = 50)
+    private String verificationFailureCode;
+
     public Long getId() { return id; }
     public String getInternalRequestId() { return internalRequestId; }
     public void setInternalRequestId(String internalRequestId) { this.internalRequestId = internalRequestId; }
@@ -61,4 +67,10 @@ public class RazorpayTestCheckoutAttempt {
     public void setStatus(String status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Instant getVerifiedAt() { return verifiedAt; }
+    public void setVerifiedAt(Instant verifiedAt) { this.verifiedAt = verifiedAt; }
+    public String getVerificationFailureCode() { return verificationFailureCode; }
+    public void setVerificationFailureCode(String verificationFailureCode) {
+        this.verificationFailureCode = verificationFailureCode;
+    }
 }

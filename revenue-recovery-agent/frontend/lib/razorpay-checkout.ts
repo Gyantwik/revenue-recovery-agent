@@ -3,6 +3,8 @@ import type {
   RazorpayCheckoutEventRequest,
   RazorpayTestConfig,
   RazorpayTestOrder,
+  RazorpayPaymentVerification,
+  RazorpayPaymentVerificationRequest,
 } from "@/lib/types"
 
 export const CHECKOUT_SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js"
@@ -79,6 +81,7 @@ export interface CheckoutFlowDependencies {
   createOrder(amount: number): Promise<RazorpayTestOrder>
   getConfig(): Promise<RazorpayTestConfig>
   recordEvent(event: RazorpayCheckoutEventRequest): Promise<RazorpayCheckoutEvent>
+  verifyPayment(request: RazorpayPaymentVerificationRequest): Promise<RazorpayPaymentVerification>
   loadScript(): Promise<void>
   createCheckout(options: RazorpayCheckoutOptions): RazorpayCheckoutInstance
   onState(state: CheckoutDisplayState): void
@@ -86,8 +89,10 @@ export interface CheckoutFlowDependencies {
 
 export interface CheckoutDisplayState {
   message: string
-  status: "order_created" | "checkout_opened" | "client_reported_unverified" | "error"
+  status: "order_created" | "checkout_opened" | "client_reported_unverified"
+    | "verified_test_payment" | "verification_failed" | "error"
   event?: RazorpayCheckoutEvent
+  verification?: RazorpayPaymentVerification
   order?: RazorpayTestOrder
 }
 
@@ -139,20 +144,46 @@ export async function startCheckoutFlow(amount: number, dependencies: CheckoutFl
     handler: response => {
       if (reported) return
       reported = true
-      void dependencies.recordEvent({
+      const verificationRequest = {
         internal_request_id: order.internal_request_id,
         razorpay_order_id: response.razorpay_order_id,
         razorpay_payment_id: response.razorpay_payment_id,
         razorpay_signature: response.razorpay_signature,
+      }
+      void dependencies.recordEvent({
+        ...verificationRequest,
         event_type: "checkout_success",
-      }).then(event => dependencies.onState({
-        message: "Checkout reported success. Server verification is pending.",
+      }).then(async event => {
+        dependencies.onState({
+          message: "Checkout reported success. Server verification is pending.",
+          status: "client_reported_unverified",
+          event,
+          order,
+        })
+        try {
+          const verification = await dependencies.verifyPayment(verificationRequest)
+          dependencies.onState({
+            message: "Razorpay Test Mode payment signature verified. This verifies checkout authenticity only; it does not update a recovery case in Phase 4C.",
+            status: "verified_test_payment",
+            event,
+            verification,
+            order,
+          })
+        } catch (error) {
+          const invalidSignature = typeof error === "object" && error !== null
+            && "status" in error && error.status === 422
+          dependencies.onState({
+            message: invalidSignature
+              ? "Checkout callback could not be verified. No recovery case was changed."
+              : "Checkout was reported, but verification could not be completed. No recovery case was changed.",
+            status: invalidSignature ? "verification_failed" : "client_reported_unverified",
+            event,
+            order,
+          })
+        }
+      }).catch(() => dependencies.onState({
+        message: "Checkout was reported, but verification could not be completed. No recovery case was changed.",
         status: "client_reported_unverified",
-        event,
-        order,
-      })).catch(error => dependencies.onState({
-        message: error instanceof Error ? error.message : "Unable to record checkout result.",
-        status: "error",
         order,
       }))
     },

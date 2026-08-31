@@ -112,3 +112,19 @@ export interface RazorpayCheckoutEvent {
   status: "client_reported_unverified"
   timestamp: string
 }
+
+export interface RazorpayPaymentVerificationRequest {
+  internal_request_id: string
+  razorpay_order_id: string
+  razorpay_payment_id: string
+  razorpay_signature: string
+}
+
+export interface RazorpayPaymentVerification {
+  internal_request_id: string
+  razorpay_order_id: string
+  razorpay_payment_id: string
+  verification_status: "verified_test_payment" | "verification_failed"
+  mode: "test"
+  verified_at?: string
+}

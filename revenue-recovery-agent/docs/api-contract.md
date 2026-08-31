@@ -94,9 +94,52 @@ Status meanings:
 | `order_created` | The frontend has received a sandbox order; no Checkout result exists. |
 | `checkout_opened` | Razorpay Test Mode Checkout was opened locally in the browser. |
 | `client_reported_unverified` | The browser reported success, failure, or dismissal; the report is not authenticated or payment-confirming. |
-| Phase 4C verification status | Not implemented. Phase 4C will perform server-side HMAC signature verification. |
+| `verified_test_payment` | Server-side HMAC authenticated the Test Mode callback. This is not capture, settlement, or recovery. |
+| `verification_failed` | Signature verification failed. This implementation treats the result as terminal. |
 
-The `/razorpay-test` page uses synthetic prefill data, dynamically loads Razorpay-hosted Checkout once, and never collects payment instrument data itself. Neither the callback nor the intake row marks anything paid, captured, settled, verified, or recovered. Checkout orders and attempts are separate from the recovery pipeline, batch totals, and recovery audit history.
+The `/razorpay-test` page uses synthetic prefill data, dynamically loads Razorpay-hosted Checkout once, and never collects payment instrument data itself. Checkout orders and attempts are separate from the recovery pipeline, batch totals, and recovery audit history.
+
+## POST `/api/razorpay/test/verify-payment`
+
+Authenticates one previously recorded `checkout_success` callback locally. It makes no Razorpay API request.
+
+Request:
+
+```json
+{
+  "internal_request_id": "req_...",
+  "razorpay_order_id": "order_...",
+  "razorpay_payment_id": "pay_...",
+  "razorpay_signature": "signature_from_checkout"
+}
+```
+
+The backend loads and locks the local Test Mode order, checks that all three public IDs map to the same recorded success attempt, checks the supplied signature against the stored callback signature, and calculates:
+
+```text
+HMAC-SHA256(stored_razorpay_order_id + "|" + razorpay_payment_id, server-only Key Secret)
+```
+
+The stored order ID is always the canonical HMAC input; the browser-provided order ID is validated but never trusted as the input source. The lowercase hexadecimal HMAC and received signature are decoded and compared with `MessageDigest.isEqual`. The Key Secret never leaves the backend and is never logged, persisted, serialized, or returned.
+
+Verified response (`200`):
+
+```json
+{
+  "internal_request_id": "req_...",
+  "razorpay_order_id": "order_...",
+  "razorpay_payment_id": "pay_...",
+  "verification_status": "verified_test_payment",
+  "mode": "test",
+  "verified_at": "2026-08-31T00:00:00Z"
+}
+```
+
+Invalid signature response (`422`) has the same public IDs, `verification_status=verification_failed`, `mode=test`, and no `verified_at`. Missing fields return `400`, unknown internal requests return `404`, missing matching success attempts return `409`, and missing/invalid Test Mode configuration returns `503`. Responses never contain the signature or Key Secret.
+
+Verification is terminal and concurrency-safe. A pessimistic lock serializes verification for each local order. A second verification of the same verified payment returns `409`; a different payment ID for an already verified order also returns `409`. An invalid signature stores the safe failure code `SIGNATURE_MISMATCH`, clears the stored callback signature, and transitions the order/attempt to terminal `verification_failed`, so later retry is rejected.
+
+Phase 4C authenticates the Test Mode callback only. It does not poll payment status, capture or settle money, create recovery actions or audit history, or change dashboard revenue. A future Phase 4D may map an eligible verified test payment to a recovery case.
 
 ## Shared transaction response
 

@@ -40,5 +40,15 @@ class RazorpayMissingConfigurationTest {
                 .andExpect(jsonPath("$.error").value("Razorpay unavailable"))
                 .andExpect(jsonPath("$.message").value("Razorpay Test Mode is not configured."))
                 .andExpect(jsonPath("$.status").value(503));
+
+        mockMvc.perform(post("/api/razorpay/test/verify-payment")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"internal_request_id":"req_test","razorpay_order_id":"order_test",
+                                 "razorpay_payment_id":"pay_test","razorpay_signature":"0000"}
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("Razorpay unavailable"))
+                .andExpect(jsonPath("$.message").value("Razorpay Test Mode is not configured."));
     }
 }

@@ -8,6 +8,7 @@ import {
   createRazorpayTestOrder,
   getRazorpayTestConfig,
   recordRazorpayCheckoutEvent,
+  verifyRazorpayTestPayment,
 } from "@/lib/api"
 import {
   loadRazorpayCheckoutScript,
@@ -38,6 +39,7 @@ export default function RazorpayTestPage() {
           createOrder: createRazorpayTestOrder,
           getConfig: getRazorpayTestConfig,
           recordEvent: recordRazorpayCheckoutEvent,
+          verifyPayment: verifyRazorpayTestPayment,
           loadScript: loadRazorpayCheckoutScript,
           createCheckout: (options: RazorpayCheckoutOptions) => {
             if (!window.Razorpay) throw new Error("Razorpay Checkout did not initialize.")
@@ -56,7 +58,7 @@ export default function RazorpayTestPage() {
     })
   }
 
-  const visible = state?.event ?? state?.order
+  const visible = state?.verification ?? state?.event ?? state?.order
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -67,7 +69,8 @@ export default function RazorpayTestPage() {
         <h1 className="text-3xl font-bold tracking-tight">Razorpay Test Mode — Checkout Demo</h1>
         <p className="text-sm leading-6 text-muted-foreground">
           This creates a sandbox order and opens Razorpay Test Mode Checkout. No real money is charged.
-          Checkout callback is not treated as verified payment until server-side verification is added in Phase 4C.
+          Checkout callbacks are verified server-side in Phase 4C. Verification authenticates the callback only;
+          it never updates a recovery case or claims capture, settlement, or recovery.
         </p>
       </div>
 
@@ -120,6 +123,12 @@ export default function RazorpayTestPage() {
                 )}
                 {state.event && <SafeValue label="Event type" value={state.event.event_type} />}
                 {state.event && <SafeValue label="Timestamp" value={state.event.timestamp} />}
+                {state.verification && (
+                  <SafeValue label="Verification status" value={state.verification.verification_status} />
+                )}
+                {state.verification?.verified_at && (
+                  <SafeValue label="Verified at" value={state.verification.verified_at} />
+                )}
               </dl>
             </CardContent>
           )}

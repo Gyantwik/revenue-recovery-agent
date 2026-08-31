@@ -21,6 +21,8 @@ curl.exe -X POST http://localhost:8080/api/razorpay/test/orders -H "Content-Type
 
 Start the frontend from `frontend/` with `npm run dev`, then open `http://localhost:3000/razorpay-test`. The page creates a server-side Test Mode order and opens Razorpay-hosted Standard Checkout. No real money is charged.
 
-The browser receives the Test Mode Key ID through `GET /api/razorpay/test/config`, which is expected for Standard Checkout. The Key Secret always remains server-side. A browser callback is stored only as `client_reported_unverified`; it is not proof that a payment is paid, captured, settled, or recovered. Phase 4C will add server-side HMAC signature verification.
+The browser receives the Test Mode Key ID through `GET /api/razorpay/test/config`, which is expected for Standard Checkout. The Key Secret always remains server-side. A browser callback is first stored as `client_reported_unverified`, then `POST /api/razorpay/test/verify-payment` authenticates it with `HMAC-SHA256(stored_order_id + "|" + payment_id, server-only Key Secret)`. The server's stored order ID—not the browser value—is the canonical HMAC input, and signature bytes are compared in constant time.
+
+`verified_test_payment` authenticates a Razorpay Test Mode Checkout callback only. It does not establish capture or settlement and does not update a RecoverAI recovery case. Invalid verification is terminal as `verification_failed`; repeated verification returns `409`. A future Phase 4D may map an eligible verified test payment to a recovery case.
 
 The checkout demo is isolated from the synthetic 65-case recovery dataset, audit history, and dashboard metrics.

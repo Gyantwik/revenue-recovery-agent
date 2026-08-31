@@ -2,6 +2,8 @@ package com.revenueRecovery.service;
 
 import com.revenueRecovery.config.RazorpayProperties;
 import com.revenueRecovery.controller.dto.CreateRazorpayTestOrderRequest;
+import com.revenueRecovery.controller.dto.RazorpayPaymentVerificationRequest;
+import com.revenueRecovery.repository.RazorpayTestCheckoutAttemptRepository;
 import com.revenueRecovery.repository.RazorpayTestOrderRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestTemplate;
@@ -35,6 +37,25 @@ class RazorpayConfigurationValidationTest {
                 service::getCheckoutConfig);
 
         assertEquals("Razorpay Test Mode is not configured.", exception.getMessage());
+    }
+
+    @Test
+    void verificationRejectsInvalidTestConfigurationBeforeDatabaseAccess() {
+        RazorpayProperties properties = new RazorpayProperties();
+        properties.setKeyId("invalid_placeholder");
+        properties.setKeySecret("safe-unit-placeholder");
+        RazorpayTestOrderRepository orderRepository = mock(RazorpayTestOrderRepository.class);
+        RazorpayTestCheckoutAttemptRepository attemptRepository =
+                mock(RazorpayTestCheckoutAttemptRepository.class);
+        RazorpaySignatureVerificationService service = new RazorpaySignatureVerificationService(
+                properties, orderRepository, attemptRepository);
+
+        RazorpayServiceException exception = assertThrows(RazorpayServiceException.class,
+                () -> service.verify(new RazorpayPaymentVerificationRequest(
+                        "req_test", "order_test", "pay_test", "0000")));
+
+        assertEquals("Razorpay Test Mode is not configured.", exception.getMessage());
+        verifyNoInteractions(orderRepository, attemptRepository);
     }
 
     private void assertConfigurationRejected(String keyId) {

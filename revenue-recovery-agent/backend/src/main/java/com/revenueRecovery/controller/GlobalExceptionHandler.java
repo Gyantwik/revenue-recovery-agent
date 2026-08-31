@@ -5,6 +5,7 @@ import com.revenueRecovery.service.TransactionNotFoundException;
 import com.revenueRecovery.service.InvalidOrderRequestException;
 import com.revenueRecovery.service.RazorpayServiceException;
 import com.revenueRecovery.service.CheckoutEventException;
+import com.revenueRecovery.service.PaymentVerificationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -71,6 +72,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CheckoutEventException.class)
     public ResponseEntity<Map<String, Object>> handleCheckoutEvent(CheckoutEventException exception) {
+        return ResponseEntity.status(exception.getStatus()).body(Map.of(
+                "error", exception.getError(),
+                "message", exception.getMessage(),
+                "status", exception.getStatus().value()));
+    }
+
+    @ExceptionHandler(PaymentVerificationException.class)
+    public ResponseEntity<Map<String, Object>> handlePaymentVerification(PaymentVerificationException exception) {
         return ResponseEntity.status(exception.getStatus()).body(Map.of(
                 "error", exception.getError(),
                 "message", exception.getMessage(),

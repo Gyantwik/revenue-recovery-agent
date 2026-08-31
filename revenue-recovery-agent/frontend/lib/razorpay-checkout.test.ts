@@ -20,7 +20,7 @@ const order = {
   mode: "test" as const,
 }
 
-function harness() {
+function harness(verificationResult: "valid" | "invalid" | "error" = "valid") {
   const calls: string[] = []
   const events: RazorpayCheckoutEventRequest[] = []
   const states: CheckoutDisplayState[] = []
@@ -40,6 +40,22 @@ function harness() {
         timestamp: "2026-08-31T00:00:00Z",
       }
     },
+    verifyPayment: async () => {
+      calls.push("verify-payment")
+      if (verificationResult !== "valid") {
+        const error = new Error("safe verification error") as Error & { status?: number }
+        if (verificationResult === "invalid") error.status = 422
+        throw error
+      }
+      return {
+        internal_request_id: order.internal_request_id,
+        razorpay_order_id: order.razorpay_order_id,
+        razorpay_payment_id: "pay_test",
+        verification_status: "verified_test_payment" as const,
+        mode: "test" as const,
+        verified_at: "2026-08-31T00:00:01Z",
+      }
+    },
     loadScript: async () => { calls.push("load-script") },
     createCheckout: (received: RazorpayCheckoutOptions) => {
       calls.push("create-checkout")
@@ -54,11 +70,12 @@ function harness() {
   return { calls, events, states, dependencies, getOptions: () => options }
 }
 
-test("checkout page clearly labels Test Mode and unverified callback status", async () => {
+test("checkout page clearly labels Test Mode and server-side verification boundary", async () => {
   const source = await readFile(new URL("../app/razorpay-test/page.tsx", import.meta.url), "utf8")
   assert.match(source, /Razorpay Test Mode — Checkout Demo/)
-  assert.match(source, /Server verification is pending|not treated as verified payment/)
+  assert.match(source, /verified server-side in Phase 4C/)
   assert.doesNotMatch(source.toLowerCase(), /key_secret|razorpay_key_secret/)
+  assert.doesNotMatch(source, /razorpay_signature/)
 })
 
 test("order is created before Checkout opens", async () => {
@@ -68,7 +85,7 @@ test("order is created before Checkout opens", async () => {
   assert.deepEqual(context.calls.slice(0, 4), ["create-order", "get-config", "load-script", "create-checkout"])
 })
 
-test("success callback records an unverified event and shows verification pending", async () => {
+test("success callback records intake before verification and shows signature verified", async () => {
   const context = harness()
   await startCheckoutFlow(500, context.dependencies)
   context.getOptions()?.handler({
@@ -79,7 +96,37 @@ test("success callback records an unverified event and shows verification pendin
   await new Promise(resolve => setTimeout(resolve, 0))
   assert.equal(context.events[0]?.event_type, "checkout_success")
   assert.equal(context.events[0]?.razorpay_payment_id, "pay_test")
-  assert.match(context.states.at(-1)?.message ?? "", /verification is pending/i)
+  assert.ok(context.calls.indexOf("record-event") < context.calls.indexOf("verify-payment"))
+  assert.match(context.states.at(-1)?.message ?? "", /signature verified/i)
+  assert.match(context.states.at(-1)?.message ?? "", /does not update a recovery case/i)
+  assert.equal(context.states.at(-1)?.status, "verified_test_payment")
+})
+
+test("invalid verification displays safe no-recovery-changed wording", async () => {
+  const context = harness("invalid")
+  await startCheckoutFlow(500, context.dependencies)
+  context.getOptions()?.handler({
+    razorpay_order_id: "order_test",
+    razorpay_payment_id: "pay_test",
+    razorpay_signature: "callback_signature",
+  })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.match(context.states.at(-1)?.message ?? "", /could not be verified/i)
+  assert.match(context.states.at(-1)?.message ?? "", /No recovery case was changed/i)
+  assert.equal(context.states.at(-1)?.status, "verification_failed")
+})
+
+test("verification error remains safely client-reported and unverified", async () => {
+  const context = harness("error")
+  await startCheckoutFlow(500, context.dependencies)
+  context.getOptions()?.handler({
+    razorpay_order_id: "order_test",
+    razorpay_payment_id: "pay_test",
+    razorpay_signature: "callback_signature",
+  })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.match(context.states.at(-1)?.message ?? "", /verification could not be completed/i)
+  assert.match(context.states.at(-1)?.message ?? "", /No recovery case was changed/i)
   assert.equal(context.states.at(-1)?.status, "client_reported_unverified")
 })
 
