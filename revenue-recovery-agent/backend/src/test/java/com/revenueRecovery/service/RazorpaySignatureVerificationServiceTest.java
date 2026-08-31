@@ -54,7 +54,8 @@ class RazorpaySignatureVerificationServiceTest {
     private RazorpaySignatureVerificationService service() {
         return new RazorpaySignatureVerificationService(new RazorpayProperties(),
                 mock(RazorpayTestOrderRepository.class),
-                mock(RazorpayTestCheckoutAttemptRepository.class));
+                mock(RazorpayTestCheckoutAttemptRepository.class),
+                mock(RecoveryPaymentFinalizationService.class));
     }
 
     private static final class TrackingVerificationService extends RazorpaySignatureVerificationService {
@@ -62,7 +63,8 @@ class RazorpaySignatureVerificationServiceTest {
 
         private TrackingVerificationService() {
             super(new RazorpayProperties(), mock(RazorpayTestOrderRepository.class),
-                    mock(RazorpayTestCheckoutAttemptRepository.class));
+                    mock(RazorpayTestCheckoutAttemptRepository.class),
+                    mock(RecoveryPaymentFinalizationService.class));
         }
 
         @Override

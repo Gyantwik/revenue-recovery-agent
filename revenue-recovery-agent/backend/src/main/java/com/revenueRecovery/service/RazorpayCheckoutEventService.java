@@ -6,6 +6,7 @@ import com.revenueRecovery.model.RazorpayTestCheckoutAttempt;
 import com.revenueRecovery.model.RazorpayTestOrder;
 import com.revenueRecovery.repository.RazorpayTestCheckoutAttemptRepository;
 import com.revenueRecovery.repository.RazorpayTestOrderRepository;
+import com.revenueRecovery.repository.RecoveryPaymentLinkRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,11 +23,14 @@ public class RazorpayCheckoutEventService {
 
     private final RazorpayTestOrderRepository orderRepository;
     private final RazorpayTestCheckoutAttemptRepository attemptRepository;
+    private final RecoveryPaymentLinkRepository recoveryLinkRepository;
 
     public RazorpayCheckoutEventService(RazorpayTestOrderRepository orderRepository,
-            RazorpayTestCheckoutAttemptRepository attemptRepository) {
+            RazorpayTestCheckoutAttemptRepository attemptRepository,
+            RecoveryPaymentLinkRepository recoveryLinkRepository) {
         this.orderRepository = orderRepository;
         this.attemptRepository = attemptRepository;
+        this.recoveryLinkRepository = recoveryLinkRepository;
     }
 
     @Transactional
@@ -69,6 +73,10 @@ public class RazorpayCheckoutEventService {
 
         order.setStatus(UNVERIFIED);
         orderRepository.save(order);
+        recoveryLinkRepository.findByInternalRequestId(request.internalRequestId()).ifPresent(link -> {
+            link.setStatus(UNVERIFIED);
+            recoveryLinkRepository.save(link);
+        });
         return new RazorpayCheckoutEventResponse(request.internalRequestId(), request.razorpayOrderId(),
                 blankToNull(request.razorpayPaymentId()), request.eventType(), UNVERIFIED, now);
     }

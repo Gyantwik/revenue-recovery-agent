@@ -73,7 +73,7 @@ function harness(verificationResult: "valid" | "invalid" | "error" = "valid") {
 test("checkout page clearly labels Test Mode and server-side verification boundary", async () => {
   const source = await readFile(new URL("../app/razorpay-test/page.tsx", import.meta.url), "utf8")
   assert.match(source, /Razorpay Test Mode — Checkout Demo/)
-  assert.match(source, /verified server-side in Phase 4C/)
+  assert.match(source, /standalone checkout remains isolated/i)
   assert.doesNotMatch(source.toLowerCase(), /key_secret|razorpay_key_secret/)
   assert.doesNotMatch(source, /razorpay_signature/)
 })

@@ -12,5 +12,8 @@ public record RazorpayPaymentVerificationResponse(
         @JsonProperty("razorpay_payment_id") String razorpayPaymentId,
         @JsonProperty("verification_status") String verificationStatus,
         String mode,
-        @JsonProperty("verified_at") Instant verifiedAt) {
+        @JsonProperty("verified_at") Instant verifiedAt,
+        @JsonProperty("recovery_event_id") String recoveryEventId,
+        @JsonProperty("recovery_status") String recoveryStatus,
+        @JsonProperty("link_status") String linkStatus) {
 }

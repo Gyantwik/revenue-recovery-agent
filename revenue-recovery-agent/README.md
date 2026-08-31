@@ -23,6 +23,8 @@ Start the frontend from `frontend/` with `npm run dev`, then open `http://localh
 
 The browser receives the Test Mode Key ID through `GET /api/razorpay/test/config`, which is expected for Standard Checkout. The Key Secret always remains server-side. A browser callback is first stored as `client_reported_unverified`, then `POST /api/razorpay/test/verify-payment` authenticates it with `HMAC-SHA256(stored_order_id + "|" + payment_id, server-only Key Secret)`. The server's stored order ID—not the browser value—is the canonical HMAC input, and signature bytes are compared in constant time.
 
-`verified_test_payment` authenticates a Razorpay Test Mode Checkout callback only. It does not establish capture or settlement and does not update a RecoverAI recovery case. Invalid verification is terminal as `verification_failed`; repeated verification returns `409`. A future Phase 4D may map an eligible verified test payment to a recovery case.
+`verified_test_payment` authenticates a Razorpay Test Mode Checkout callback only; it does not establish capture or settlement. Invalid verification is terminal as `verification_failed`, and repeated verification returns `409`.
 
-The checkout demo is isolated from the synthetic 65-case recovery dataset, audit history, and dashboard metrics.
+The `/razorpay-test` page also contains a separate **Live Test Mode Recovery Demo**. Its deterministic `TXN_DEMO_RECOVERY_001` case is a ₹500 checkout-abandonment case governed by `Checkout Abandoned -> Send Recovery Link`. The backend—not the browser—derives the order amount and policy eligibility. Only a valid server-side signature can atomically transition this dedicated case to `recovered` and append one audit-history entry.
+
+The dedicated demo case is not an `AuditRecord` and is excluded from the **Synthetic Benchmark — 65 seeded cases**. Baseline totals remain 65 cases, ₹191,209 at risk, ₹95,647 recovered, and recovery rate 0.5002. Test Mode only: no real money, capture, settlement, merchant payout, webhook, polling, or Reserve Pay behavior is implemented.

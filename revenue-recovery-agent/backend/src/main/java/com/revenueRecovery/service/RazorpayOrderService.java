@@ -41,22 +41,40 @@ public class RazorpayOrderService {
 
     @Transactional
     public RazorpayTestOrderResponse createTestOrder(CreateRazorpayTestOrderRequest request) {
-        validateConfiguration();
         if (request == null) throw new InvalidOrderRequestException("Request body is required");
         if (!"INR".equals(request.currency())) {
             throw new InvalidOrderRequestException("Only INR currency is supported");
         }
+        return createTestOrder(request.amount(), request.currency(),
+                Map.of("source", "recoverai_test_mode", "environment", "test"));
+    }
 
-        long amountPaise = RazorpayAmountConverter.toPaise(request.amount());
-        BigDecimal amountInr = request.amount().setScale(2);
+    @Transactional
+    public RazorpayTestOrderResponse createRecoveryTestOrder(
+            BigDecimal amount, String currency, String recoveryEventId) {
+        if (!"INR".equals(currency)) {
+            throw new InvalidOrderRequestException("Only INR currency is supported");
+        }
+        return createTestOrder(amount, currency, Map.of(
+                "source", "recoverai_recovery_demo",
+                "purpose", "recovery_demo",
+                "environment", "test",
+                "recovery_event_id", recoveryEventId));
+    }
+
+    private RazorpayTestOrderResponse createTestOrder(
+            BigDecimal amount, String currency, Map<String, String> notes) {
+        validateConfiguration();
+
+        long amountPaise = RazorpayAmountConverter.toPaise(amount);
+        BigDecimal amountInr = amount.setScale(2);
         String internalRequestId = "req_" + UUID.randomUUID().toString().replace("-", "");
         String receipt = "recoverai_" + UUID.randomUUID().toString().replace("-", "").substring(0, 30);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBasicAuth(properties.getKeyId(), properties.getKeySecret(), StandardCharsets.UTF_8);
-        UpstreamOrderRequest upstreamRequest = new UpstreamOrderRequest(amountPaise, "INR", receipt,
-                Map.of("source", "recoverai_test_mode", "environment", "test"));
+        UpstreamOrderRequest upstreamRequest = new UpstreamOrderRequest(amountPaise, currency, receipt, notes);
 
         UpstreamOrderResponse upstream;
         try {
@@ -81,14 +99,14 @@ public class RazorpayOrderService {
         stored.setReceipt(receipt);
         stored.setAmountInr(amountInr);
         stored.setAmountPaise(amountPaise);
-        stored.setCurrency("INR");
+        stored.setCurrency(currency);
         stored.setStatus("created");
         stored.setMode("test");
         stored.setCreatedAt(Instant.now());
         repository.save(stored);
 
         return new RazorpayTestOrderResponse(internalRequestId, upstream.id(), amountPaise,
-                "INR", receipt, "created", "test");
+                currency, receipt, "created", "test");
     }
 
     private void validateConfiguration() {

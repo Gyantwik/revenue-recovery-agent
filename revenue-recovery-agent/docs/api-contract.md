@@ -96,6 +96,7 @@ Status meanings:
 | `client_reported_unverified` | The browser reported success, failure, or dismissal; the report is not authenticated or payment-confirming. |
 | `verified_test_payment` | Server-side HMAC authenticated the Test Mode callback. This is not capture, settlement, or recovery. |
 | `verification_failed` | Signature verification failed. This implementation treats the result as terminal. |
+| `recovered_by_verified_test_payment` | The dedicated demo case was atomically recovered after valid Test Mode signature verification. This is not a capture or settlement claim. |
 
 The `/razorpay-test` page uses synthetic prefill data, dynamically loads Razorpay-hosted Checkout once, and never collects payment instrument data itself. Checkout orders and attempts are separate from the recovery pipeline, batch totals, and recovery audit history.
 
@@ -139,7 +140,69 @@ Invalid signature response (`422`) has the same public IDs, `verification_status
 
 Verification is terminal and concurrency-safe. A pessimistic lock serializes verification for each local order. A second verification of the same verified payment returns `409`; a different payment ID for an already verified order also returns `409`. An invalid signature stores the safe failure code `SIGNATURE_MISMATCH`, clears the stored callback signature, and transitions the order/attempt to terminal `verification_failed`, so later retry is rejected.
 
-Phase 4C authenticates the Test Mode callback only. It does not poll payment status, capture or settle money, create recovery actions or audit history, or change dashboard revenue. A future Phase 4D may map an eligible verified test payment to a recovery case.
+For an unlinked order, verification authenticates the Test Mode callback only. For the explicitly linked Phase 4D demo order, the same transaction also finalizes the dedicated demo recovery case and returns optional `recovery_event_id`, `recovery_status`, and `link_status` fields. It never polls payment status, captures or settles money, or changes benchmark revenue.
+
+## Test Mode recovery demo
+
+The recovery demo is deliberately separate from the deterministic benchmark. `TXN_DEMO_RECOVERY_001` is persisted in `recovery_demo_case` as a ₹500 payment-degradation / checkout-abandonment example with policy action `SEND_RECOVERY_LINK`, initial outcome `NOT_RECOVERED`, and status `awaiting_customer_payment`. It is not stored in `audit_record`, so the baseline remains exactly 65 cases, ₹191,209 at risk, ₹95,647 recovered, and recovery rate 0.5002.
+
+Eligibility is derived exclusively from persisted root cause, policy action, outcome, amount, and existing-link state. Only policies resolving to `SEND_RECOVERY_LINK` or `SEND_ALT_PAYMENT_LINK` are compatible. Cancelled, PIN/auth-failure, payment-pending, weak-network/client-timeout, gateway/manual-review, mandate-expired/revoked, unknown, stopped, escalated, or already-recovered cases are rejected. The frontend cannot override policy or submit an order amount.
+
+### GET `/api/recovery/test-mode/demo-case`
+
+Returns the safe, clearly labelled demo case:
+
+```json
+{
+  "event_id": "TXN_DEMO_RECOVERY_001",
+  "type": "Payment Degradation",
+  "failure_root_cause": "Checkout Abandoned",
+  "amount": 500.00,
+  "currency": "INR",
+  "policy_action": "Send Recovery Link",
+  "recovery_status": "awaiting_customer_payment",
+  "razorpay_mode": "test",
+  "demo_only": true
+}
+```
+
+### POST `/api/recovery/{eventId}/razorpay-test-order`
+
+Creates at most one linked Test Mode order. The endpoint accepts no policy, amount, or currency input; any request body is ignored. The backend locks the persisted case, re-evaluates policy, derives ₹500/INR, creates the Razorpay order, and stores a `recovery_payment_link` with unique event, internal-request, order, and optional payment IDs.
+
+```json
+{
+  "event_id": "TXN_DEMO_RECOVERY_001",
+  "internal_request_id": "req_...",
+  "razorpay_order_id": "order_...",
+  "amount": 50000,
+  "currency": "INR",
+  "receipt": "recoverai_...",
+  "link_status": "order_created",
+  "recovery_status": "awaiting_customer_payment",
+  "mode": "test"
+}
+```
+
+Unknown events return `404`. Ineligible, already-recovered, or already-linked cases return `409` with a safe business reason.
+
+### GET `/api/recovery/{eventId}/razorpay-test-status`
+
+Returns the event ID, policy eligibility, recovery/link status, safe public Razorpay IDs, verification/recovery timestamps, `mode=test`, and the demo event's append-only audit history. It never returns a signature, Key Secret, payment-instrument detail, or personal data.
+
+On `checkout_success`, the existing intake endpoint first changes the link to `client_reported_unverified` without changing recovery. A valid call to the existing verification endpoint then locks the order/link/case and atomically:
+
+1. stores `verified_test_payment` on the checkout attempt/order;
+2. stores the public payment ID and timestamps on the recovery link;
+3. transitions the demo case to outcome `RECOVERED` and status `recovered`;
+4. appends one `AuditHistory` entry with result `RECOVERY_PAYMENT_VERIFIED_TEST_MODE`, actor `razorpay_test_verification`, and mode `TEST`;
+5. transitions the link to `recovered_by_verified_test_payment`.
+
+A pessimistic order/link/case lock and database uniqueness constraints prevent duplicate links and concurrent double recovery. Repeated verification returns `409` and cannot append a second audit entry. Any persistence/audit failure rolls back the verification, link, case, and history changes together. Invalid verification moves only Razorpay/link status to `verification_failed`; the recovery case and audit history remain unchanged.
+
+Status sequence: `awaiting_customer_payment` → `order_created` → browser-only `checkout_opened` → `client_reported_unverified` → `verified_test_payment` → `recovered_by_verified_test_payment`. `verification_failed` is a terminal alternative after intake.
+
+This feature is Test Mode only. It makes no claim that funds are captured, settled, refunded, paid out, or merchant-settled, and it implements no webhooks, polling, subscriptions, mandates, Live Mode, Reserve Pay, escrow, or payouts.
 
 ## Shared transaction response
 

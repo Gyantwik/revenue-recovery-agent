@@ -48,7 +48,8 @@ class RazorpayConfigurationValidationTest {
         RazorpayTestCheckoutAttemptRepository attemptRepository =
                 mock(RazorpayTestCheckoutAttemptRepository.class);
         RazorpaySignatureVerificationService service = new RazorpaySignatureVerificationService(
-                properties, orderRepository, attemptRepository);
+                properties, orderRepository, attemptRepository,
+                mock(RecoveryPaymentFinalizationService.class));
 
         RazorpayServiceException exception = assertThrows(RazorpayServiceException.class,
                 () -> service.verify(new RazorpayPaymentVerificationRequest(

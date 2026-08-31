@@ -7,6 +7,9 @@ import type {
   RazorpayTestOrder,
   RazorpayPaymentVerification,
   RazorpayPaymentVerificationRequest,
+  RecoveryDemoCase,
+  RecoveryLinkedOrder,
+  RecoveryPaymentStatus,
   Transaction,
 } from "@/lib/types"
 
@@ -238,4 +241,55 @@ export async function verifyRazorpayTestPayment(
     throw new ApiError("Backend returned an invalid verification response")
   }
   return result as RazorpayPaymentVerification
+}
+
+export async function getRecoveryDemoCase(): Promise<RecoveryDemoCase> {
+  const body = await requestJson("/api/recovery/test-mode/demo-case")
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid recovery demo case")
+  }
+  const demo = body as Partial<RecoveryDemoCase>
+  if (typeof demo.event_id !== "string" || demo.type !== "Payment Degradation"
+    || demo.failure_root_cause !== "Checkout Abandoned" || !isFiniteNumber(demo.amount)
+    || demo.currency !== "INR" || demo.policy_action !== "Send Recovery Link"
+    || !["awaiting_customer_payment", "recovered"].includes(demo.recovery_status ?? "")
+    || demo.razorpay_mode !== "test" || demo.demo_only !== true) {
+    throw new ApiError("Backend returned an invalid recovery demo case")
+  }
+  return demo as RecoveryDemoCase
+}
+
+export async function createRecoveryTestOrder(eventId: string): Promise<RecoveryLinkedOrder> {
+  const body = await requestJson(
+    `/api/recovery/${encodeURIComponent(eventId)}/razorpay-test-order`,
+    { method: "POST" },
+  )
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid linked recovery order")
+  }
+  const order = body as Partial<RecoveryLinkedOrder>
+  if (order.event_id !== eventId || typeof order.internal_request_id !== "string"
+    || typeof order.razorpay_order_id !== "string" || !isFiniteNumber(order.amount)
+    || order.currency !== "INR" || typeof order.receipt !== "string"
+    || order.link_status !== "order_created" || order.recovery_status !== "awaiting_customer_payment"
+    || order.mode !== "test") {
+    throw new ApiError("Backend returned an invalid linked recovery order")
+  }
+  return order as RecoveryLinkedOrder
+}
+
+export async function getRecoveryTestStatus(eventId: string): Promise<RecoveryPaymentStatus> {
+  const body = await requestJson(
+    `/api/recovery/${encodeURIComponent(eventId)}/razorpay-test-status`,
+  )
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid recovery payment status")
+  }
+  const status = body as Partial<RecoveryPaymentStatus>
+  if (status.event_id !== eventId || typeof status.eligible !== "boolean"
+    || !["awaiting_customer_payment", "recovered"].includes(status.recovery_status ?? "")
+    || status.mode !== "test" || !Array.isArray(status.audit_history)) {
+    throw new ApiError("Backend returned an invalid recovery payment status")
+  }
+  return status as RecoveryPaymentStatus
 }

@@ -29,13 +29,16 @@ public class RazorpaySignatureVerificationService {
     private final RazorpayProperties properties;
     private final RazorpayTestOrderRepository orderRepository;
     private final RazorpayTestCheckoutAttemptRepository attemptRepository;
+    private final RecoveryPaymentFinalizationService recoveryFinalizationService;
 
     public RazorpaySignatureVerificationService(RazorpayProperties properties,
             RazorpayTestOrderRepository orderRepository,
-            RazorpayTestCheckoutAttemptRepository attemptRepository) {
+            RazorpayTestCheckoutAttemptRepository attemptRepository,
+            RecoveryPaymentFinalizationService recoveryFinalizationService) {
         this.properties = properties;
         this.orderRepository = orderRepository;
         this.attemptRepository = attemptRepository;
+        this.recoveryFinalizationService = recoveryFinalizationService;
     }
 
     @Transactional
@@ -77,8 +80,10 @@ public class RazorpaySignatureVerificationService {
             order.setStatus(FAILED);
             attemptRepository.save(attempt);
             orderRepository.save(order);
+            RecoveryPaymentFinalizationService.RecoveryFinalizationResult recoveryResult =
+                    recoveryFinalizationService.markVerificationFailedIfLinked(order).orElse(null);
             return new VerificationOutcome(HttpStatus.UNPROCESSABLE_ENTITY,
-                    response(request, order, FAILED, null));
+                    response(request, order, FAILED, null, recoveryResult));
         }
 
         Instant verifiedAt = Instant.now();
@@ -89,8 +94,11 @@ public class RazorpaySignatureVerificationService {
         order.setStatus(VERIFIED);
         attemptRepository.save(attempt);
         orderRepository.save(order);
+        RecoveryPaymentFinalizationService.RecoveryFinalizationResult recoveryResult =
+                recoveryFinalizationService.finalizeIfLinked(
+                        order, request.razorpayPaymentId(), verifiedAt).orElse(null);
         return new VerificationOutcome(HttpStatus.OK,
-                response(request, order, VERIFIED, verifiedAt));
+                response(request, order, VERIFIED, verifiedAt, recoveryResult));
     }
 
     boolean verifySignature(String storedOrderId, String paymentId, String receivedSignature, String secret) {
@@ -151,9 +159,13 @@ public class RazorpaySignatureVerificationService {
     }
 
     private RazorpayPaymentVerificationResponse response(RazorpayPaymentVerificationRequest request,
-            RazorpayTestOrder order, String status, Instant verifiedAt) {
+            RazorpayTestOrder order, String status, Instant verifiedAt,
+            RecoveryPaymentFinalizationService.RecoveryFinalizationResult recoveryResult) {
         return new RazorpayPaymentVerificationResponse(request.internalRequestId(),
-                order.getRazorpayOrderId(), request.razorpayPaymentId(), status, "test", verifiedAt);
+                order.getRazorpayOrderId(), request.razorpayPaymentId(), status, "test", verifiedAt,
+                recoveryResult == null ? null : recoveryResult.eventId(),
+                recoveryResult == null ? null : recoveryResult.recoveryStatus(),
+                recoveryResult == null ? null : recoveryResult.linkStatus());
     }
 
     private boolean isBlank(String value) {

@@ -127,4 +127,54 @@ export interface RazorpayPaymentVerification {
   verification_status: "verified_test_payment" | "verification_failed"
   mode: "test"
   verified_at?: string
+  recovery_event_id?: string
+  recovery_status?: "awaiting_customer_payment" | "recovered"
+  link_status?: "verification_failed" | "recovered_by_verified_test_payment"
+}
+
+export interface RecoveryDemoCase {
+  event_id: string
+  type: "Payment Degradation"
+  failure_root_cause: "Checkout Abandoned"
+  amount: number
+  currency: "INR"
+  policy_action: "Send Recovery Link"
+  recovery_status: "awaiting_customer_payment" | "recovered"
+  razorpay_mode: "test"
+  demo_only: true
+}
+
+export interface RecoveryLinkedOrder {
+  event_id: string
+  internal_request_id: string
+  razorpay_order_id: string
+  amount: number
+  currency: "INR"
+  receipt: string
+  link_status: "order_created"
+  recovery_status: "awaiting_customer_payment"
+  mode: "test"
+}
+
+export interface RecoveryAuditEntry {
+  timestamp: string
+  action: string
+  outcome: string
+  reason: string
+  actor: string
+}
+
+export interface RecoveryPaymentStatus {
+  event_id: string
+  eligible: boolean
+  recovery_status: "awaiting_customer_payment" | "recovered"
+  link_status?: "order_created" | "client_reported_unverified" | "verified_test_payment"
+    | "recovered_by_verified_test_payment" | "verification_failed"
+  internal_request_id?: string
+  razorpay_order_id?: string
+  razorpay_payment_id?: string
+  verified_at?: string
+  recovered_at?: string
+  mode: "test"
+  audit_history: RecoveryAuditEntry[]
 }
