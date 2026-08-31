@@ -28,3 +28,9 @@ The browser receives the Test Mode Key ID through `GET /api/razorpay/test/config
 The `/razorpay-test` page also contains a separate **Live Test Mode Recovery Demo**. Its deterministic `TXN_DEMO_RECOVERY_001` case is a ₹500 checkout-abandonment case governed by `Checkout Abandoned -> Send Recovery Link`. The backend—not the browser—derives the order amount and policy eligibility. Only a valid server-side signature can atomically transition this dedicated case to `recovered` and append one audit-history entry.
 
 The dedicated demo case is not an `AuditRecord` and is excluded from the **Synthetic Benchmark — 65 seeded cases**. Baseline totals remain 65 cases, ₹191,209 at risk, ₹95,647 recovered, and recovery rate 0.5002. Test Mode only: no real money, capture, settlement, merchant payout, webhook, polling, or Reserve Pay behavior is implemented.
+
+## Policy-aware next recovery decisions
+
+Transaction details load `GET /api/transactions/{eventId}/next-action` and display one backend-owned recommendation with its reason, safe next step, and policy guardrail. The UI intentionally has no generic **Recover Amount** or **Mark Recovered** shortcut. Stopped and recovered cases are disabled; pending payments show status-verification guidance; uncertain, gateway, expired-mandate, and retry-exhausted cases show non-financial review/escalation guidance; scheduled retries remain informational.
+
+Normal synthetic benchmark records are read-only in this decision view. Only `TXN_DEMO_RECOVERY_001` can return `OPEN_TEST_MODE_RECOVERY_CHECKOUT`, which reuses the existing server-derived Razorpay Test Mode flow. Clicking any informational decision does not create an order, retry, audit entry, or recovered outcome. The demo becomes recovered only after hosted Checkout and successful server-side HMAC verification.

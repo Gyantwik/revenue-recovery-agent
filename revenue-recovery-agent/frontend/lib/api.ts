@@ -10,6 +10,7 @@ import type {
   RecoveryDemoCase,
   RecoveryLinkedOrder,
   RecoveryPaymentStatus,
+  NextRecoveryActionDecision,
   Transaction,
 } from "@/lib/types"
 
@@ -134,6 +135,38 @@ export async function getTransaction(eventId: string): Promise<Transaction> {
     throw new ApiError("Backend returned an invalid transaction response")
   }
   return body
+}
+
+export async function getNextRecoveryAction(eventId: string): Promise<NextRecoveryActionDecision> {
+  const body = await requestJson(`/api/transactions/${encodeURIComponent(eventId)}/next-action`)
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid next-action response")
+  }
+  const decision = body as Partial<NextRecoveryActionDecision>
+  const recommendations = [
+    "ALREADY_RECOVERED", "STOPPED_BY_POLICY", "ESCALATE_TO_MERCHANT",
+    "ESCALATE_MANDATE_RENEWAL", "VERIFY_PAYMENT_STATUS", "AWAIT_SCHEDULED_RETRY",
+    "AWAIT_SCHEDULED_MANDATE_RETRY", "ESCALATE_AFTER_RETRY_EXHAUSTED",
+    "SEND_RECOVERY_LINK", "SEND_ALT_PAYMENT_LINK",
+  ]
+  const actionTypes = ["NONE", "DISPLAY_INFORMATION", "OPEN_TEST_MODE_RECOVERY_CHECKOUT"]
+  if (decision.event_id !== eventId
+    || typeof decision.current_outcome !== "string"
+    || typeof decision.lifecycle_state !== "string"
+    || !isFiniteNumber(decision.attempts_made)
+    || !isFiniteNumber(decision.max_attempts)
+    || typeof decision.is_action_allowed !== "boolean"
+    || !recommendations.includes(decision.recommended_action ?? "")
+    || typeof decision.button_label !== "string"
+    || typeof decision.title !== "string"
+    || typeof decision.reason !== "string"
+    || typeof decision.next_step !== "string"
+    || typeof decision.risk_note !== "string"
+    || !actionTypes.includes(decision.action_type ?? "")
+    || !["synthetic_benchmark", "razorpay_test_demo"].includes(decision.mode ?? "")) {
+    throw new ApiError("Backend returned an invalid next-action response")
+  }
+  return decision as NextRecoveryActionDecision
 }
 
 const ACTION_PATHS = {

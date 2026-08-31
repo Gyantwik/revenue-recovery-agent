@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
+import Link from "next/link"
 import {
   Dialog,
   DialogContent,
@@ -10,16 +11,17 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { StatusBadge, CauseBadge } from "@/components/status-badge"
-import type { Transaction } from "@/lib/types"
-import type { ActionTaken } from "@/lib/labels"
+import type { NextRecoveryActionDecision, Transaction } from "@/lib/types"
 import { ACTION_LABELS, CASE_TYPE_LABELS } from "@/lib/labels"
-import { isTerminalLifecycle, triggerTransactionAction } from "@/lib/api"
+import { getNextRecoveryAction } from "@/lib/api"
+import { formatRecoveryStatus, getNextActionInteraction, getRecoveryDemoHref } from "@/lib/next-recovery-action"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
 import {
-  CheckCircle2,
+  ExternalLink,
+  Info,
   Radio,
-  Send,
   Loader2,
+  ShieldAlert,
 } from "lucide-react"
 
 interface TransactionDetailDialogProps {
@@ -33,28 +35,28 @@ export function TransactionDetailDialog({
   open,
   onOpenChange,
 }: TransactionDetailDialogProps) {
-  const [actionDone, setActionDone] = useState<string | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [actionPending, setActionPending] = useState(false)
+  const [decision, setDecision] = useState<NextRecoveryActionDecision | null>(null)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+  const [decisionLoading, setDecisionLoading] = useState(false)
+  const [informationAcknowledged, setInformationAcknowledged] = useState(false)
+
+  useEffect(() => {
+    if (!open || !transaction) return
+    let active = true
+    setDecision(null)
+    setDecisionError(null)
+    setInformationAcknowledged(false)
+    setDecisionLoading(true)
+    void getNextRecoveryAction(transaction.event_id)
+      .then(result => { if (active) setDecision(result) })
+      .catch(error => {
+        if (active) setDecisionError(error instanceof Error ? error.message : "Unable to load the next recovery decision")
+      })
+      .finally(() => { if (active) setDecisionLoading(false) })
+    return () => { active = false }
+  }, [open, transaction])
 
   if (!transaction) return null
-
-  const handleAction = async (action: ActionTaken) => {
-    setActionPending(true)
-    setActionError(null)
-    try {
-      const result = await triggerTransactionAction(
-        transaction.event_id,
-        action,
-        `${transaction.event_id}:frontend:${transaction.attempt_number + 1}:${action}`,
-      )
-      setActionDone(`${ACTION_LABELS[action]}: ${result.reason}`)
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Policy blocked this action")
-    } finally {
-      setActionPending(false)
-    }
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,18 +92,6 @@ export function TransactionDetailDialog({
           </div>
         </DialogHeader>
 
-        {actionDone && (
-          <div className="p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center gap-2 animate-in fade-in">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <span><strong>Action Executed:</strong> {actionDone}</span>
-          </div>
-        )}
-        {actionError && (
-          <div role="alert" className="p-3 rounded-md bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-200">
-            <strong>Action blocked by policy:</strong> {actionError}
-          </div>
-        )}
-
         <div className="space-y-4 py-2">
           {/* Classification & Confidence */}
           <div className="p-3.5 rounded-lg bg-muted/40 border space-y-2">
@@ -122,6 +112,40 @@ export function TransactionDetailDialog({
             <p className="text-xs text-muted-foreground">
               At risk: <strong>{transaction.is_at_risk ? "Yes" : "No"}</strong>
             </p>
+          </div>
+
+          {/* Backend-owned next action: this card never derives policy from UI strings. */}
+          <div className="p-3.5 rounded-lg border border-teal-200 bg-teal-50/40 dark:border-teal-900 dark:bg-teal-950/20 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-300 flex items-center gap-1.5">
+              <ShieldAlert className="h-3.5 w-3.5" /> Next Recovery Decision
+            </h4>
+
+            {decisionLoading && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading policy decision…
+              </p>
+            )}
+            {decisionError && (
+              <p role="alert" className="text-xs text-red-700 dark:text-red-300">
+                Decision unavailable: {decisionError}. No recovery action was performed.
+              </p>
+            )}
+            {decision && (
+              <>
+                <dl className="grid gap-3 text-xs sm:grid-cols-2">
+                  <DecisionDetail label="Current Recovery Status" value={formatRecoveryStatus(decision)} />
+                  <DecisionDetail label="Recommended Action" value={decision.title} />
+                  <DecisionDetail label="Why" value={decision.reason} wide />
+                  <DecisionDetail label="Safe Next Step" value={decision.next_step} wide />
+                  <DecisionDetail label="Policy Guardrail" value={decision.risk_note} wide />
+                </dl>
+                <DecisionButton
+                  decision={decision}
+                  acknowledged={informationAcknowledged}
+                  onAcknowledge={() => setInformationAcknowledged(true)}
+                />
+              </>
+            )}
           </div>
 
           {/* Signals Used */}
@@ -204,21 +228,8 @@ export function TransactionDetailDialog({
             </div>
           )}
 
-          {/* Interactive Actions */}
+          {/* Closing the modal is the only generic action; policy actions live in the decision card. */}
           <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t">
-            {!isTerminalLifecycle(transaction.lifecycle_state) && !actionDone && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleAction(transaction.action_taken)}
-                disabled={actionPending}
-                className="gap-1.5 text-xs"
-              >
-                {actionPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                Run test-mode {ACTION_LABELS[transaction.action_taken]}
-              </Button>
-            )}
-
             <Button
               size="sm"
               onClick={() => onOpenChange(false)}
@@ -230,5 +241,58 @@ export function TransactionDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function DecisionDetail({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "sm:col-span-2" : undefined}>
+      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}:</dt>
+      <dd className="mt-0.5 font-medium leading-5">{value}</dd>
+    </div>
+  )
+}
+
+function DecisionButton({
+  decision,
+  acknowledged,
+  onAcknowledge,
+}: {
+  decision: NextRecoveryActionDecision
+  acknowledged: boolean
+  onAcknowledge: () => void
+}) {
+  const interaction = getNextActionInteraction(decision)
+  const demoHref = getRecoveryDemoHref(decision)
+
+  if (interaction === "test_mode_checkout" && demoHref) {
+    return (
+      <Button asChild size="sm" className="gap-1.5 text-xs">
+        <Link href={demoHref}>
+          <ExternalLink className="h-3.5 w-3.5" /> {decision.button_label}
+        </Link>
+      </Button>
+    )
+  }
+
+  if (interaction === "information") {
+    return (
+      <div className="space-y-2">
+        <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs" onClick={onAcknowledge}>
+          <Info className="h-3.5 w-3.5" /> {decision.button_label}
+        </Button>
+        {acknowledged && (
+          <p role="status" className="text-xs text-muted-foreground">
+            Guidance acknowledged. No payment, retry, order, outcome, or audit record was created.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <Button type="button" variant="outline" size="sm" className="text-xs" disabled>
+      {decision.button_label}
+    </Button>
   )
 }

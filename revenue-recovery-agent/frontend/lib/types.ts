@@ -55,6 +55,38 @@ export interface ActionResult {
   next_eligible_action_at: string | null
 }
 
+export type NextRecoveryAction =
+  | "ALREADY_RECOVERED"
+  | "STOPPED_BY_POLICY"
+  | "ESCALATE_TO_MERCHANT"
+  | "ESCALATE_MANDATE_RENEWAL"
+  | "VERIFY_PAYMENT_STATUS"
+  | "AWAIT_SCHEDULED_RETRY"
+  | "AWAIT_SCHEDULED_MANDATE_RETRY"
+  | "ESCALATE_AFTER_RETRY_EXHAUSTED"
+  | "SEND_RECOVERY_LINK"
+  | "SEND_ALT_PAYMENT_LINK"
+
+export type NextActionType = "NONE" | "DISPLAY_INFORMATION" | "OPEN_TEST_MODE_RECOVERY_CHECKOUT"
+export type NextActionMode = "synthetic_benchmark" | "razorpay_test_demo"
+
+export interface NextRecoveryActionDecision {
+  event_id: string
+  current_outcome: TransactionOutcome
+  lifecycle_state: string
+  attempts_made: number
+  max_attempts: number
+  is_action_allowed: boolean
+  recommended_action: NextRecoveryAction
+  button_label: string
+  title: string
+  reason: string
+  next_step: string
+  risk_note: string
+  action_type: NextActionType
+  mode: NextActionMode
+}
+
 export interface CauseSummary {
   root_cause: RootCause
   count: number

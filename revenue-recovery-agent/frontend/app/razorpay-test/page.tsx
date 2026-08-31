@@ -12,6 +12,7 @@ import {
   createRecoveryTestOrder,
   getRecoveryDemoCase,
   getRecoveryTestStatus,
+  getNextRecoveryAction,
 } from "@/lib/api"
 import {
   loadRazorpayCheckoutScript,
@@ -21,7 +22,8 @@ import {
   type RazorpayCheckoutOptions,
 } from "@/lib/razorpay-checkout"
 import { startRecoveryDemoFlow, type RecoveryDemoFlowState } from "@/lib/recovery-demo"
-import type { RecoveryDemoCase, RecoveryPaymentStatus } from "@/lib/types"
+import { getNextActionInteraction } from "@/lib/next-recovery-action"
+import type { NextRecoveryActionDecision, RecoveryDemoCase, RecoveryPaymentStatus } from "@/lib/types"
 
 export default function RazorpayTestPage() {
   const [amount, setAmount] = useState("500.00")
@@ -31,6 +33,7 @@ export default function RazorpayTestPage() {
   const runRecoveryFlow = useRef(createSingleFlightRunner())
   const [demoCase, setDemoCase] = useState<RecoveryDemoCase | null>(null)
   const [demoStatus, setDemoStatus] = useState<RecoveryPaymentStatus | null>(null)
+  const [demoDecision, setDemoDecision] = useState<NextRecoveryActionDecision | null>(null)
   const [demoLoadingError, setDemoLoadingError] = useState<string | null>(null)
   const [recoveryBusy, setRecoveryBusy] = useState(false)
   const [recoveryState, setRecoveryState] = useState<RecoveryDemoFlowState | null>(null)
@@ -38,7 +41,12 @@ export default function RazorpayTestPage() {
   useEffect(() => {
     void getRecoveryDemoCase().then(async demo => {
       setDemoCase(demo)
-      setDemoStatus(await getRecoveryTestStatus(demo.event_id))
+      const [status, decision] = await Promise.all([
+        getRecoveryTestStatus(demo.event_id),
+        getNextRecoveryAction(demo.event_id),
+      ])
+      setDemoStatus(status)
+      setDemoDecision(decision)
     }).catch(error => {
       setDemoLoadingError(error instanceof Error ? error.message : "Unable to load the recovery demo case.")
     })
@@ -63,7 +71,10 @@ export default function RazorpayTestPage() {
           },
           onState: next => {
             setRecoveryState(next)
-            if (next.recovery) setDemoStatus(next.recovery)
+            if (next.recovery) {
+              setDemoStatus(next.recovery)
+              void getNextRecoveryAction(demoCase.event_id).then(setDemoDecision)
+            }
           },
         })
       } catch (error) {
@@ -112,6 +123,7 @@ export default function RazorpayTestPage() {
   }
 
   const visible = state?.verification ?? state?.event ?? state?.order
+  const demoInteraction = demoDecision ? getNextActionInteraction(demoDecision) : "disabled"
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -157,9 +169,10 @@ export default function RazorpayTestPage() {
           <Button
             onClick={createAndOpenRecoveryCheckout}
             disabled={!demoCase || recoveryBusy || Boolean(recoveryState?.order)
+              || demoInteraction !== "test_mode_checkout"
               || demoStatus?.recovery_status === "recovered" || Boolean(demoStatus?.link_status)}
           >
-            {recoveryBusy ? "Preparing Recovery Checkout…" : "Create Linked Recovery Order"}
+            {recoveryBusy ? "Preparing Recovery Checkout…" : demoDecision?.button_label ?? "Open Test Mode Recovery Checkout"}
           </Button>
           {recoveryState && (
             <div className="rounded-md border bg-muted/30 p-4 text-sm">

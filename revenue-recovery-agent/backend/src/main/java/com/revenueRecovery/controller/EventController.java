@@ -1,8 +1,10 @@
 package com.revenueRecovery.controller;
 
 import com.revenueRecovery.controller.dto.AuditRecordResponse;
+import com.revenueRecovery.controller.dto.NextRecoveryActionResponse;
 import com.revenueRecovery.repository.AuditRecordRepository;
 import com.revenueRecovery.repository.AuditHistoryRepository;
+import com.revenueRecovery.service.TransactionNextActionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,10 +23,19 @@ public class EventController {
 
     private final AuditRecordRepository auditRecordRepository;
     private final AuditHistoryRepository auditHistoryRepository;
+    private final TransactionNextActionService nextActionService;
 
-    public EventController(AuditRecordRepository auditRecordRepository, AuditHistoryRepository auditHistoryRepository) {
+    public EventController(AuditRecordRepository auditRecordRepository,
+            AuditHistoryRepository auditHistoryRepository,
+            TransactionNextActionService nextActionService) {
         this.auditRecordRepository = auditRecordRepository;
         this.auditHistoryRepository = auditHistoryRepository;
+        this.nextActionService = nextActionService;
+    }
+
+    @GetMapping("/{eventId}/next-action")
+    public NextRecoveryActionResponse getNextAction(@PathVariable String eventId) {
+        return nextActionService.decide(eventId);
     }
 
     @GetMapping("/{eventId}")

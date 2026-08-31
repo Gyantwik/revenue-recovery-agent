@@ -280,7 +280,55 @@ Outcomes: `recovered`, `not_recovered`, `escalated`, `stopped_correctly`.
 - Unexpected errors: `500` with `{"error":"Internal server error"}`.
 - Frontend consumer: dedicated transaction detail route, including links from Escalated to Desk.
 
-The transaction-row dialog intentionally reuses the complete audit object already returned by `GET /api/transactions`; it does not invent or supplement fields. Direct detail navigation and escalation links use the single-transaction endpoint.
+The transaction-row dialog uses the complete audit object returned by `GET /api/transactions`, then separately loads the backend-owned policy recommendation described below. Direct detail navigation and escalation links use the single-transaction endpoint.
+
+## GET `/api/transactions/{eventId}/next-action`
+
+Returns a read-only, policy-derived explanation of the current state and exactly one safe next recommendation. Looking up a decision never creates a retry, order, Checkout attempt, audit note, notification, payment, or outcome change.
+
+```json
+{
+  "event_id": "TXN10059",
+  "current_outcome": "not_recovered",
+  "lifecycle_state": "retry_exhausted",
+  "attempts_made": 2,
+  "max_attempts": 2,
+  "is_action_allowed": true,
+  "recommended_action": "ESCALATE_AFTER_RETRY_EXHAUSTED",
+  "button_label": "Review Mandate / Escalate",
+  "title": "Automatic retries are exhausted",
+  "reason": "This mandate retry has reached its maximum of 2 attempts. Further automatic retries are blocked.",
+  "next_step": "Review the mandate or escalate the case for manual resolution.",
+  "risk_note": "Do not initiate another automatic debit attempt.",
+  "action_type": "DISPLAY_INFORMATION",
+  "mode": "synthetic_benchmark"
+}
+```
+
+Stable `action_type` values:
+
+| Value | Meaning |
+| --- | --- |
+| `NONE` | Blocked, completed, or informationally scheduled; the button is disabled. |
+| `DISPLAY_INFORMATION` | Shows/acknowledges guidance in the browser only. No backend mutation occurs. |
+| `OPEN_TEST_MODE_RECOVERY_CHECKOUT` | Navigates only the dedicated demo case to the existing Razorpay Test Mode recovery flow. |
+
+Stable `recommended_action` values are `ALREADY_RECOVERED`, `STOPPED_BY_POLICY`, `ESCALATE_TO_MERCHANT`, `ESCALATE_MANDATE_RENEWAL`, `VERIFY_PAYMENT_STATUS`, `AWAIT_SCHEDULED_RETRY`, `AWAIT_SCHEDULED_MANDATE_RETRY`, `ESCALATE_AFTER_RETRY_EXHAUSTED`, `SEND_RECOVERY_LINK`, and `SEND_ALT_PAYMENT_LINK`. Modes are `synthetic_benchmark` and `razorpay_test_demo`.
+
+Policy behavior:
+
+- recovered cases return `ALREADY_RECOVERED`;
+- cancelled and PIN/authentication-failure cases return `STOPPED_BY_POLICY`;
+- unknown and gateway cases return merchant-review guidance;
+- expired/revoked mandates return mandate-review guidance;
+- pending payments return status-verification guidance to avoid duplicate debit;
+- bank/network/mandate retries with attempts remaining stay scheduled and cannot be manually forced;
+- exhausted retries return review/escalation guidance and prohibit another automatic debit;
+- ordinary checkout-abandoned and insufficient-balance benchmark rows expose policy guidance only and cannot open Checkout;
+- only the separate, eligible `TXN_DEMO_RECOVERY_001` returns `OPEN_TEST_MODE_RECOVERY_CHECKOUT`;
+- after verified demo recovery, the same event returns `ALREADY_RECOVERED`.
+
+Recommended actions, scheduled actions, escalation guidance, and blocked actions are not payment success. **Recover Amount** and **Mark Recovered** are intentionally absent. Only the dedicated demo's verified Razorpay Test Mode callback can atomically change its separate recovery status. The original 65-case benchmark remains static and excluded from the demo; no real money moves.
 
 ## Synthetic action endpoints
 
