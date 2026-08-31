@@ -2,6 +2,9 @@ package com.revenueRecovery.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.revenueRecovery.model.AuditRecord;
+import com.revenueRecovery.model.AuditHistory;
+import com.revenueRecovery.model.enums.AuditActor;
+import com.revenueRecovery.model.enums.LifecycleState;
 import com.revenueRecovery.model.enums.ActionTaken;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RootCause;
@@ -28,9 +31,17 @@ public record AuditRecordResponse(
         @JsonProperty("max_attempts_allowed") Integer maxAttemptsAllowed,
         Outcome outcome,
         @JsonProperty("recovered_amount") BigDecimal recoveredAmount,
-        @JsonProperty("stop_or_escalate_reason") String stopOrEscalateReason) {
+        @JsonProperty("stop_or_escalate_reason") String stopOrEscalateReason,
+        @JsonProperty("lifecycle_state") LifecycleState lifecycleState,
+        @JsonProperty("next_eligible_action_at") Instant nextEligibleActionAt,
+        @JsonProperty("recovery_window_expires_at") Instant recoveryWindowExpiresAt,
+        List<HistoryResponse> history) {
 
     public static AuditRecordResponse from(AuditRecord record) {
+        return from(record, List.of());
+    }
+
+    public static AuditRecordResponse from(AuditRecord record, List<AuditHistory> history) {
         return new AuditRecordResponse(
                 record.getEventId(),
                 record.getCaseType(),
@@ -48,7 +59,11 @@ public record AuditRecordResponse(
                 record.getMaxAttemptsAllowed(),
                 record.getOutcome(),
                 record.getRecoveredAmount(),
-                record.getStopOrEscalateReason());
+                record.getStopOrEscalateReason(),
+                record.getLifecycleState(),
+                record.getNextEligibleActionAt(),
+                record.getRecoveryWindowExpiresAt(),
+                history.stream().map(HistoryResponse::from).toList());
     }
 
     private static List<String> splitSignals(String signals) {
@@ -56,5 +71,27 @@ public record AuditRecordResponse(
             return List.of();
         }
         return Arrays.stream(signals.split("; ", -1)).toList();
+    }
+
+    public record HistoryResponse(
+            Instant timestamp,
+            @JsonProperty("previous_state") LifecycleState previousState,
+            @JsonProperty("new_state") LifecycleState newState,
+            @JsonProperty("root_cause") RootCause rootCause,
+            @JsonProperty("classification_confidence") BigDecimal classificationConfidence,
+            @JsonProperty("policy_rule_matched") String policyRuleMatched,
+            @JsonProperty("action_taken") ActionTaken actionTaken,
+            @JsonProperty("attempt_number") Integer attemptNumber,
+            @JsonProperty("max_attempts_allowed") Integer maxAttemptsAllowed,
+            @JsonProperty("outcome_if_terminal") Outcome outcomeIfTerminal,
+            String reason,
+            AuditActor actor,
+            @JsonProperty("idempotency_key_or_action_sequence_key") String idempotencyKey) {
+        static HistoryResponse from(AuditHistory history) {
+            return new HistoryResponse(history.getTimestamp(), history.getPreviousState(), history.getNewState(),
+                    history.getRootCause(), history.getClassificationConfidence(), history.getPolicyRuleMatched(),
+                    history.getActionTaken(), history.getAttemptNumber(), history.getMaxAttemptsAllowed(),
+                    history.getOutcomeIfTerminal(), history.getReason(), history.getActor(), history.getIdempotencyKey());
+        }
     }
 }

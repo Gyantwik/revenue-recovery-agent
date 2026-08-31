@@ -36,7 +36,8 @@ class ApiContractTest {
             "event_id", "case_type", "amount", "currency", "timestamp", "is_at_risk",
             "risk_amount", "root_cause", "classification_confidence", "signals_used",
             "policy_rule_matched", "action_taken", "attempt_number", "max_attempts_allowed",
-            "outcome", "recovered_amount", "stop_or_escalate_reason");
+            "outcome", "recovered_amount", "stop_or_escalate_reason", "lifecycle_state",
+            "next_eligible_action_at", "recovery_window_expires_at", "history");
 
     @Autowired
     private MockMvc mockMvc;
@@ -167,5 +168,13 @@ class ApiContractTest {
         mockMvc.perform(get("/api/transactions/TXN10013"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.event_id").value("TXN10013"));
+
+        mockMvc.perform(post("/api/transactions/TXN10029/actions/retry")
+                        .header("Idempotency-Key", "pending-retry-contract"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.event_id").value("TXN10029"))
+                .andExpect(jsonPath("$.current_state").value("escalated"))
+                .andExpect(jsonPath("$.requested_action").value("retry_payment"))
+                .andExpect(jsonPath("$.reason").isString());
     }
 }

@@ -1,7 +1,10 @@
 import { RootCause, TransactionOutcome, CaseType, ActionTaken, ROOT_CAUSE_CONFIG } from "./labels"
 import type { Transaction } from "./types"
 
-export const MOCK_TRANSACTIONS: Transaction[] = [
+type LegacyMockTransaction = Omit<Transaction,
+  "lifecycle_state" | "next_eligible_action_at" | "recovery_window_expires_at" | "history">
+
+const LEGACY_MOCK_TRANSACTIONS: LegacyMockTransaction[] = [
   {
     "event_id": "TXN10001",
     "case_type": "payment_degradation",
@@ -1433,6 +1436,17 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     "stop_or_escalate_reason": null
   }
 ]
+
+// Retained for isolated UI development only; normal runtime always uses backend APIs.
+export const MOCK_TRANSACTIONS: Transaction[] = LEGACY_MOCK_TRANSACTIONS.map(transaction => ({
+  ...transaction,
+  lifecycle_state: transaction.outcome === "recovered" ? "recovered"
+    : transaction.outcome === "escalated" ? "escalated"
+      : transaction.outcome === "stopped_correctly" ? "stopped" : "not_recovered",
+  next_eligible_action_at: null,
+  recovery_window_expires_at: null,
+  history: [],
+}))
 
 export interface RecoverySummaryStats {
   total_events: number

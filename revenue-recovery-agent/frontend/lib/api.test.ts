@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { ApiError, getBatchSummary, getTransaction, getTransactions } from "./api.ts"
+import { ApiError, getBatchSummary, getTransaction, getTransactions, isTerminalLifecycle, triggerTransactionAction } from "./api.ts"
 
 const originalFetch = globalThis.fetch
 
@@ -42,5 +42,25 @@ test("transaction detail preserves a backend 404", async () => {
     (error: unknown) => error instanceof ApiError
       && error.status === 404
       && error.message === "Transaction not found",
+  )
+})
+
+test("terminal lifecycle helper disables later actions", () => {
+  assert.equal(isTerminalLifecycle("recovered"), true)
+  assert.equal(isTerminalLifecycle("retry_exhausted"), true)
+  assert.equal(isTerminalLifecycle("retry_scheduled"), false)
+})
+
+test("blocked action exposes backend policy reason", async () => {
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    event_id: "TXN-PENDING",
+    current_state: "verifying_payment",
+    requested_action: "retry_payment",
+    reason: "Action blocked by deterministic policy; allowed action is verify_status",
+  }), { status: 409, headers: { "Content-Type": "application/json" } })
+
+  await assert.rejects(
+    triggerTransactionAction("TXN-PENDING", "retry_payment", "duplicate"),
+    /allowed action is verify_status/,
   )
 })

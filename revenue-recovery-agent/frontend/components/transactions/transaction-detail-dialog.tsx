@@ -11,14 +11,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { StatusBadge, CauseBadge } from "@/components/status-badge"
 import type { Transaction } from "@/lib/types"
+import type { ActionTaken } from "@/lib/labels"
 import { ACTION_LABELS, CASE_TYPE_LABELS } from "@/lib/labels"
+import { isTerminalLifecycle, triggerTransactionAction } from "@/lib/api"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
 import {
   CheckCircle2,
-  RotateCw,
-  UserCheck,
   Radio,
-  Send
+  Send,
+  Loader2,
 } from "lucide-react"
 
 interface TransactionDetailDialogProps {
@@ -33,14 +34,26 @@ export function TransactionDetailDialog({
   onOpenChange,
 }: TransactionDetailDialogProps) {
   const [actionDone, setActionDone] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionPending, setActionPending] = useState(false)
 
   if (!transaction) return null
 
-  const handleAction = (actionName: string) => {
-    setActionDone(actionName)
-    setTimeout(() => {
-      setActionDone(null)
-    }, 4000)
+  const handleAction = async (action: ActionTaken) => {
+    setActionPending(true)
+    setActionError(null)
+    try {
+      const result = await triggerTransactionAction(
+        transaction.event_id,
+        action,
+        `${transaction.event_id}:frontend:${transaction.attempt_number + 1}:${action}`,
+      )
+      setActionDone(`${ACTION_LABELS[action]}: ${result.reason}`)
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Policy blocked this action")
+    } finally {
+      setActionPending(false)
+    }
   }
 
   return (
@@ -81,6 +94,11 @@ export function TransactionDetailDialog({
           <div className="p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center gap-2 animate-in fade-in">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             <span><strong>Action Executed:</strong> {actionDone}</span>
+          </div>
+        )}
+        {actionError && (
+          <div role="alert" className="p-3 rounded-md bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-200">
+            <strong>Action blocked by policy:</strong> {actionError}
           </div>
         )}
 
@@ -140,6 +158,12 @@ export function TransactionDetailDialog({
                 </span>
               </div>
               <div className="p-2.5 rounded bg-muted/30 border">
+                <span className="text-muted-foreground block text-[11px]">Lifecycle State:</span>
+                <span className="font-semibold text-foreground text-sm">
+                  {transaction.lifecycle_state.replaceAll("_", " ")}
+                </span>
+              </div>
+              <div className="p-2.5 rounded bg-muted/30 border">
                 <span className="text-muted-foreground block text-[11px]">Attempts Made / Max:</span>
                 <span className="font-bold text-foreground text-sm">
                   {transaction.attempt_number}/{transaction.max_attempts_allowed}
@@ -165,38 +189,33 @@ export function TransactionDetailDialog({
             )}
           </div>
 
+          {transaction.history.length > 0 && (
+            <div className="p-3.5 rounded-lg border bg-card space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Audit Timeline</h4>
+              <ol className="space-y-3 border-l pl-4">
+                {transaction.history.map((entry, index) => (
+                  <li key={`${entry.timestamp}-${index}`} className="text-xs">
+                    <div className="font-semibold">{entry.previous_state ?? "start"} → {entry.new_state}</div>
+                    <div className="text-muted-foreground">{formatDateTime(entry.timestamp)} · {entry.actor.replaceAll("_", " ")}</div>
+                    <p className="mt-1">{entry.reason}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
           {/* Interactive Actions */}
           <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t">
-            {transaction.action_taken === "send_alt_payment_link" && (
+            {!isTerminalLifecycle(transaction.lifecycle_state) && !actionDone && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleAction("Resent Instant Payment Link via WhatsApp & SMS")}
+                onClick={() => handleAction(transaction.action_taken)}
+                disabled={actionPending}
                 className="gap-1.5 text-xs"
               >
-                <Send className="h-3.5 w-3.5" /> Resend Payment Link
-              </Button>
-            )}
-
-            {transaction.attempt_number < transaction.max_attempts_allowed && transaction.outcome !== "recovered" && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => handleAction(`Triggered immediate retry #${transaction.attempt_number + 1}`)}
-                className="gap-1.5 text-xs"
-              >
-                <RotateCw className="h-3.5 w-3.5" /> Force Retry
-              </Button>
-            )}
-
-            {transaction.outcome !== "escalated" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleAction("Case manually escalated to Merchant Support Desk")}
-                className="gap-1.5 text-xs text-amber-700 dark:text-amber-400 border-amber-300"
-              >
-                <UserCheck className="h-3.5 w-3.5" /> Route to Support
+                {actionPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                Run test-mode {ACTION_LABELS[transaction.action_taken]}
               </Button>
             )}
 

@@ -28,6 +28,28 @@ public class ActionExecutor {
                 .orElseGet(() -> simulateAction(event, policyDecision));
     }
 
+    public AuditRecord executeAuthorized(Event event, PolicyDecision policyDecision, int attemptNumber) {
+        AuditRecord execution = new AuditRecord();
+        ActionTaken action = policyDecision.getActionTaken();
+        execution.setActionTaken(action);
+        execution.setMaxAttemptsAllowed(policyDecision.getMaxAttemptsAllowed());
+        execution.setAttemptNumber(policyDecision.getMaxAttemptsAllowed() == 0 ? 0 : attemptNumber);
+        if (action == ActionTaken.NO_ACTION_STOP) {
+            execution.setOutcome(Outcome.STOPPED_CORRECTLY);
+            execution.setRecoveredAmount(ZERO);
+        } else if (action == ActionTaken.ESCALATE_MERCHANT) {
+            execution.setOutcome(Outcome.ESCALATED);
+            execution.setRecoveredAmount(ZERO);
+        } else {
+            boolean recovered = Math.floorMod((event.getEventId() + ":" + attemptNumber).hashCode(), 100) < 60;
+            execution.setOutcome(recovered
+                    ? Outcome.RECOVERED
+                    : action == ActionTaken.VERIFY_STATUS ? Outcome.ESCALATED : Outcome.NOT_RECOVERED);
+            execution.setRecoveredAmount(recovered ? event.getAmount() : ZERO);
+        }
+        return execution;
+    }
+
     private AuditRecord simulateAction(Event event, PolicyDecision policyDecision) {
         AuditRecord execution = new AuditRecord();
         ActionTaken action = policyDecision.getActionTaken();
@@ -52,7 +74,9 @@ public class ActionExecutor {
 
         int eventHash = event.getEventId().hashCode();
         boolean recovered = Math.floorMod(eventHash, 100) < 60;
-        execution.setOutcome(recovered ? Outcome.RECOVERED : Outcome.NOT_RECOVERED);
+        execution.setOutcome(recovered
+                ? Outcome.RECOVERED
+                : action == ActionTaken.VERIFY_STATUS ? Outcome.ESCALATED : Outcome.NOT_RECOVERED);
         execution.setRecoveredAmount(recovered ? event.getAmount() : ZERO);
 
         if (maxAttempts > 0) {

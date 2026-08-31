@@ -1,5 +1,28 @@
 import type { ActionTaken, CaseType, RootCause, TransactionOutcome } from "@/lib/labels"
 
+export type LifecycleState =
+  | "received" | "at_risk" | "classified" | "action_approved"
+  | "retry_scheduled" | "verifying_payment" | "recovery_link_sent"
+  | "retry_exhausted" | "recovered" | "not_recovered" | "stopped" | "escalated"
+
+export type AuditActor = "system_simulation" | "merchant_manual"
+
+export interface AuditHistoryEntry {
+  timestamp: string
+  previous_state: LifecycleState | null
+  new_state: LifecycleState
+  root_cause: RootCause
+  classification_confidence: number
+  policy_rule_matched: string
+  action_taken: ActionTaken | null
+  attempt_number: number
+  max_attempts_allowed: number
+  outcome_if_terminal: TransactionOutcome | null
+  reason: string
+  actor: AuditActor
+  idempotency_key_or_action_sequence_key: string
+}
+
 export interface Transaction {
   event_id: string
   case_type: CaseType
@@ -18,6 +41,18 @@ export interface Transaction {
   outcome: TransactionOutcome
   recovered_amount: number
   stop_or_escalate_reason: string | null
+  lifecycle_state: LifecycleState
+  next_eligible_action_at: string | null
+  recovery_window_expires_at: string | null
+  history: AuditHistoryEntry[]
+}
+
+export interface ActionResult {
+  event_id: string
+  current_state: LifecycleState
+  requested_action: ActionTaken
+  reason: string
+  next_eligible_action_at: string | null
 }
 
 export interface CauseSummary {

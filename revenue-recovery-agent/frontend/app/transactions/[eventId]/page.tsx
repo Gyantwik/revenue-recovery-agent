@@ -55,6 +55,9 @@ export default async function TransactionDetailPage({ params }: { params: { even
           <Detail label="Action taken" value={ACTION_LABELS[transaction.action_taken]} />
           <Detail label="Attempts / maximum" value={formatAttemptCount(transaction.attempt_number, transaction.max_attempts_allowed)} />
           <Detail label="Outcome" value={transaction.outcome} />
+          <Detail label="Lifecycle state" value={transaction.lifecycle_state.replaceAll("_", " ")} />
+          <Detail label="Next eligible action" value={transaction.next_eligible_action_at ? formatDateTime(transaction.next_eligible_action_at) : "Not scheduled"} />
+          <Detail label="Recovery window expires" value={transaction.recovery_window_expires_at ? formatDateTime(transaction.recovery_window_expires_at) : "Not applicable"} />
           <Detail label="Stop or escalation reason" value={transaction.stop_or_escalate_reason ?? "Not applicable"} />
         </dl>
 
@@ -66,6 +69,23 @@ export default async function TransactionDetailPage({ params }: { params: { even
             ))}
             {transaction.signals_used.length === 0 && <span className="text-sm text-muted-foreground">No signals recorded</span>}
           </div>
+        </div>
+
+        <div>
+          <h2 className="text-sm font-semibold">Append-only audit timeline</h2>
+          {transaction.history.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">No lifecycle history recorded.</p>
+          ) : (
+            <ol className="mt-3 space-y-3 border-l pl-5">
+              {transaction.history.map((entry, index) => (
+                <li key={`${entry.timestamp}-${index}`} className="text-sm">
+                  <p className="font-semibold">{entry.previous_state ?? "start"} → {entry.new_state}</p>
+                  <p className="text-xs text-muted-foreground">{formatDateTime(entry.timestamp)} · {entry.actor.replaceAll("_", " ")}</p>
+                  <p className="mt-1 text-sm">{entry.reason}</p>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       </div>
     </div>

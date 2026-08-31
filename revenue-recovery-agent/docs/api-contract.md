@@ -27,6 +27,10 @@ Transaction endpoints return these audit fields:
 | `outcome` | string | One of the outcome values below. |
 | `recovered_amount` | decimal | Synthetic recovered amount. |
 | `stop_or_escalate_reason` | string or null | Present for stopped or escalated cases. |
+| `lifecycle_state` | string | Current recovery lifecycle state. Terminal values cannot return to active states. |
+| `next_eligible_action_at` | ISO-8601 string or null | Earliest synthetic/manual retry time when applicable. |
+| `recovery_window_expires_at` | ISO-8601 string or null | End of the 30-minute bank/network recovery window when applicable. |
+| `history` | array | Append-only lifecycle/action timeline. Summary-list responses may return an empty array; detail responses include all entries. |
 
 Root causes: `bank_temp_error`, `weak_network`, `payment_pending`, `insufficient_balance`, `user_cancelled`, `incorrect_pin`, `merchant_gateway_issue`, `checkout_abandoned`, `mandate_failed_retryable`, `mandate_expired`, `unknown`.
 
@@ -77,6 +81,25 @@ Outcomes: `recovered`, `not_recovered`, `escalated`, `stopped_correctly`.
 - Frontend consumer: dedicated transaction detail route, including links from Escalated to Desk.
 
 The transaction-row dialog intentionally reuses the complete audit object already returned by `GET /api/transactions`; it does not invent or supplement fields. Direct detail navigation and escalation links use the single-transaction endpoint.
+
+## Synthetic action endpoints
+
+These endpoints perform deterministic test-mode actions only. They never call Razorpay, a bank, NPCI, or a customer-messaging service. The backend validates the current lifecycle, root-cause policy, attempt cap, recovery window, terminal-state rule, and the optional `Idempotency-Key` header before execution.
+
+- `POST /api/transactions/{eventId}/actions/retry`
+- `POST /api/transactions/{eventId}/actions/verify-status`
+- `POST /api/transactions/{eventId}/actions/send-recovery-link`
+- `POST /api/transactions/{eventId}/actions/send-alt-payment-link`
+- `POST /api/transactions/{eventId}/actions/escalate`
+- `POST /api/transactions/{eventId}/actions/stop`
+
+A permitted request returns `200` with `event_id`, `current_state`, `requested_action`, `reason`, and optional `next_eligible_action_at`. A policy-blocked request returns the same shape with `409 Conflict`. A missing transaction returns `404`.
+
+Lifecycle history records the previous and new states, classification and policy evidence, action and attempt counts, terminal outcome, reason, actor (`system_simulation` or `merchant_manual`), and an idempotency/action-sequence key. Existing entries are never updated.
+
+## Batch rerun safety
+
+The backend uses Option B: existing transaction and lifecycle history are reused by `event_id`. Repeated `POST /api/batch/run` calls do not duplicate transactions, history, at-risk revenue, or recovered revenue.
 
 ## Attempt-count rules
 

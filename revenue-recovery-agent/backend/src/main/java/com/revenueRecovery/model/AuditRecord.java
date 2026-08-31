@@ -3,6 +3,7 @@ package com.revenueRecovery.model;
 import com.revenueRecovery.model.enums.ActionTaken;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RootCause;
+import com.revenueRecovery.model.enums.LifecycleState;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -83,6 +84,19 @@ public class AuditRecord {
     @Column(name = "stop_or_escalate_reason", length = 200)
     private String stopOrEscalateReason;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    // Nullable at the schema level so Hibernate can upgrade an existing Phase 2 H2 table;
+    // the pipeline immediately backfills and persists a state for every processed record.
+    @Column(name = "lifecycle_state", length = 30)
+    private LifecycleState lifecycleState = LifecycleState.RECEIVED;
+
+    @Column(name = "next_eligible_action_at", columnDefinition = "TIMESTAMP")
+    private Instant nextEligibleActionAt;
+
+    @Column(name = "recovery_window_expires_at", columnDefinition = "TIMESTAMP")
+    private Instant recoveryWindowExpiresAt;
+
     public AuditRecord() {
     }
 
@@ -125,4 +139,10 @@ public class AuditRecord {
     public void setRecoveredAmount(BigDecimal recoveredAmount) { this.recoveredAmount = recoveredAmount; }
     public String getStopOrEscalateReason() { return stopOrEscalateReason; }
     public void setStopOrEscalateReason(String stopOrEscalateReason) { this.stopOrEscalateReason = stopOrEscalateReason; }
+    public LifecycleState getLifecycleState() { return lifecycleState; }
+    public void setLifecycleState(LifecycleState lifecycleState) { this.lifecycleState = lifecycleState; }
+    public Instant getNextEligibleActionAt() { return nextEligibleActionAt; }
+    public void setNextEligibleActionAt(Instant nextEligibleActionAt) { this.nextEligibleActionAt = nextEligibleActionAt; }
+    public Instant getRecoveryWindowExpiresAt() { return recoveryWindowExpiresAt; }
+    public void setRecoveryWindowExpiresAt(Instant recoveryWindowExpiresAt) { this.recoveryWindowExpiresAt = recoveryWindowExpiresAt; }
 }

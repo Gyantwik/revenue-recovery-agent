@@ -64,7 +64,7 @@ public class AuditService {
                 return "User explicitly cancelled — policy forbids retry";
             }
             if (auditRecord.getRootCause() == RootCause.INCORRECT_PIN) {
-                return "Authentication failure — policy forbids retry";
+                return "Authentication failure — customer must initiate a fresh payment";
             }
             return "Policy requires processing to stop";
         }
@@ -77,7 +77,10 @@ public class AuditService {
                 return "Merchant/gateway-side issue — requires manual review";
             }
             if (auditRecord.getRootCause() == RootCause.MANDATE_EXPIRED) {
-                return "Mandate expired — requires merchant review";
+                return "Mandate expired — fresh customer mandate/consent required";
+            }
+            if (auditRecord.getRootCause() == RootCause.PAYMENT_PENDING) {
+                return "Original payment status must be verified to avoid a duplicate debit";
             }
             return "Policy requires manual review";
         }
