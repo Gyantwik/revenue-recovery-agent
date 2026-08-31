@@ -9,6 +9,19 @@ target/
 
 # Local H2 database files
 backend/data/
+*.mv.db
+*.trace.db
+*.h2.db
 
-# Local source archive
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Local source archives
 backend.zip
+revenue-recovery-agent/backend.zip
+*.zip
