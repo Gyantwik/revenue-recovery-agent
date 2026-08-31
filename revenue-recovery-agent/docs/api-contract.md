@@ -4,6 +4,45 @@ RecoverAI is a synthetic/test-mode demonstration. None of these endpoints initia
 
 The backend listens on `http://localhost:8080` by default. The Next.js server uses that URL unless `NEXT_PUBLIC_API_BASE_URL` overrides it. JSON property names and enum values use lowercase `snake_case`.
 
+## POST `/api/razorpay/test/orders`
+
+Creates one Razorpay Test Mode order from the backend. Credentials are read server-side from `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`; neither credential is accepted from or returned to the frontend. Missing, live-mode, or otherwise invalid Key IDs fail safely without preventing the synthetic recovery APIs from starting.
+
+Request:
+
+```json
+{
+  "amount": 500.00,
+  "currency": "INR"
+}
+```
+
+`amount` is INR and must be between ₹1.00 and ₹10,000.00 with at most two decimal places. Only `INR` is supported. The backend converts INR to paise using `BigDecimal`, generates a unique receipt, and sends only `source=recoverai_test_mode` and `environment=test` as notes.
+
+Success (`200 OK`):
+
+```json
+{
+  "internal_request_id": "req_...",
+  "razorpay_order_id": "order_...",
+  "amount": 50000,
+  "currency": "INR",
+  "receipt": "recoverai_...",
+  "status": "created",
+  "mode": "test"
+}
+```
+
+The response `amount` is paise. `created` means an order exists; it does not mean a payment occurred or money was collected.
+
+Invalid requests return `400`. Missing/invalid Test Mode configuration returns `503`. Razorpay non-success responses return a safe `502`, while network/timeouts return a safe `503`. Error bodies contain only `error`, `message`, and numeric `status`; upstream response bodies and credentials are never returned.
+
+Successful mappings are stored separately in `razorpay_test_order` with internal request ID, Razorpay order ID, receipt, INR and paise amounts, currency, `created` status, `test` mode, and creation time. They never enter the recovery pipeline or affect batch totals, recovered revenue, recovery rate, or recovery audit history.
+
+For local setup, copy `backend/.env.example` to the ignored `backend/.env`, set Test Mode values for the two named variables, and start Spring Boot from `backend/`. No Razorpay configuration is required for the existing synthetic APIs.
+
+This phase creates Razorpay Test Mode orders only. It does not open checkout, verify payments, process a payment, capture money, execute mandate retries, or change recovery metrics.
+
 ## Shared transaction response
 
 Transaction endpoints return these audit fields:

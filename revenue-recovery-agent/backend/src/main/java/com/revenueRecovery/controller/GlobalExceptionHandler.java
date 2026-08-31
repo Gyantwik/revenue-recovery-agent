@@ -2,10 +2,13 @@ package com.revenueRecovery.controller;
 
 import com.revenueRecovery.service.RecoveryActionBlockedException;
 import com.revenueRecovery.service.TransactionNotFoundException;
+import com.revenueRecovery.service.InvalidOrderRequestException;
+import com.revenueRecovery.service.RazorpayServiceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +42,30 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleInvalidRequest(IllegalArgumentException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "Invalid request"));
+    }
+
+    @ExceptionHandler(InvalidOrderRequestException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidOrderRequest(InvalidOrderRequestException exception) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "error", "Invalid order request",
+                "message", exception.getMessage(),
+                "status", HttpStatus.BAD_REQUEST.value()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleUnreadableRequest(HttpMessageNotReadableException exception) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "error", "Invalid order request",
+                "message", "Request body must be valid JSON",
+                "status", HttpStatus.BAD_REQUEST.value()));
+    }
+
+    @ExceptionHandler(RazorpayServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleRazorpayService(RazorpayServiceException exception) {
+        return ResponseEntity.status(exception.getStatus()).body(Map.of(
+                "error", exception.getError(),
+                "message", exception.getMessage(),
+                "status", exception.getStatus().value()));
     }
 
     @ExceptionHandler(Exception.class)
