@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionSystemException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,6 +95,15 @@ public class GlobalExceptionHandler {
                 "error", exception.getError(),
                 "message", exception.getMessage(),
                 "status", exception.getStatus().value()));
+    }
+
+    @ExceptionHandler({DataAccessException.class, TransactionSystemException.class})
+    public ResponseEntity<Map<String, Object>> handlePersistenceFailure(Exception exception) {
+        LOGGER.error("Persistence failure while processing API request", exception);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Persistence error",
+                "message", "The payment could not be finalized. Please try again.",
+                "status", HttpStatus.INTERNAL_SERVER_ERROR.value()));
     }
 
     @ExceptionHandler(Exception.class)

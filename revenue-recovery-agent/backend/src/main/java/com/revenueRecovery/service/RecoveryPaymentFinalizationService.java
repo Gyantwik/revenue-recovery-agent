@@ -155,12 +155,17 @@ public class RecoveryPaymentFinalizationService {
         if (!order.getRazorpayOrderId().equals(link.getRazorpayOrderId())
                 || !"test".equals(order.getMode()) || !"test".equals(link.getMode())
                 || !TransactionRecoveryCheckoutService.PURPOSE.equals(link.getPurpose())
-                || !RazorpayCheckoutEventService.UNVERIFIED.equals(link.getStatus())
+                || !isReconciliableTransactionLink(link.getStatus())
                 || order.getAmountPaise() == null || !order.getAmountPaise().equals(link.getAmountPaise())
                 || record.getAmount() == null || record.getAmount().compareTo(link.getAmountInr()) != 0
                 || !record.getCurrency().equals(link.getCurrency())) {
             throw RecoveryPaymentException.inconsistentLink();
         }
+    }
+
+    private boolean isReconciliableTransactionLink(String status) {
+        return RazorpayCheckoutEventService.UNVERIFIED.equals(status)
+                || RecoveryTransactionEligibilityService.ABANDONED.equals(status);
     }
 
     private void validateMapping(RazorpayTestOrder order, RecoveryPaymentLink link,

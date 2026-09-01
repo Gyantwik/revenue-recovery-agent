@@ -160,6 +160,9 @@ class TransactionRecoveryFinalizationServiceTest {
         attempt.setStatus(RazorpayCheckoutEventService.UNVERIFIED);
         attempt.setCreatedAt(Instant.now());
         attemptRepository.saveAndFlush(attempt);
+        TransactionRecoveryPaymentLink staleLink = linkRepository.findByEventEventId(EVENT_ID).orElseThrow();
+        staleLink.setStatus(RecoveryTransactionEligibilityService.ABANDONED);
+        linkRepository.saveAndFlush(staleLink);
 
         var recovered = statusService.check(EVENT_ID);
         assertEquals("recovered", recovered.status());

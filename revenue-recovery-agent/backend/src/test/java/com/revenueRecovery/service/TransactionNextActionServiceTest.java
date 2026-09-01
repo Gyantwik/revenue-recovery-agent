@@ -3,6 +3,7 @@ package com.revenueRecovery.service;
 import com.revenueRecovery.controller.dto.NextRecoveryActionResponse;
 import com.revenueRecovery.model.AuditRecord;
 import com.revenueRecovery.model.RecoveryDemoCase;
+import com.revenueRecovery.model.TransactionRecoveryPaymentLink;
 import com.revenueRecovery.model.enums.LifecycleState;
 import com.revenueRecovery.model.enums.NextActionMode;
 import com.revenueRecovery.model.enums.NextActionType;
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -62,6 +64,22 @@ class TransactionNextActionServiceTest {
         assertDecision(decide(record("pin", RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY,
                 LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.TRY_PAYMENT_AGAIN_SECURELY,
                 NextActionType.OPEN_RECOVERY_CHECKOUT, true);
+    }
+
+    @Test
+    void activeIncorrectPinCheckoutReportsPendingInsteadOfStopped() {
+        AuditRecord record = record("TXN10006", RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY,
+                LifecycleState.STOPPED, 0, 0);
+        TransactionRecoveryPaymentLink link = new TransactionRecoveryPaymentLink();
+        link.setStatus(RazorpayCheckoutEventService.UNVERIFIED);
+        link.setCreatedAt(Instant.now());
+        when(transactionLinkRepository.findByEventEventId("TXN10006")).thenReturn(Optional.of(link));
+
+        NextRecoveryActionResponse result = decide(record);
+
+        assertEquals(NextActionType.RESUME_RECOVERY_CHECKOUT, result.actionType());
+        assertEquals("recovery_payment_pending", result.lifecycleState());
+        assertTrue(result.actionAllowed());
     }
 
     @Test

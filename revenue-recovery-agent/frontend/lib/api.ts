@@ -36,11 +36,26 @@ export class ApiError extends Error {
 }
 
 async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000)
+  const abortFromCaller = () => controller.abort()
+  init?.signal?.addEventListener("abort", abortFromCaller, { once: true })
+  if (init?.signal?.aborted) controller.abort()
   let response: Response
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, { cache: "no-store", ...init })
-  } catch {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      cache: "no-store",
+      ...init,
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError("Backend request timed out. Please try again.")
+    }
     throw new ApiError("Unable to connect to the backend")
+  } finally {
+    clearTimeout(timeout)
+    init?.signal?.removeEventListener("abort", abortFromCaller)
   }
 
   if (!response.ok) {

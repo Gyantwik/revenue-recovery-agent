@@ -39,8 +39,6 @@ public class TransactionRecoveryStatusService {
     public TransactionRecoveryStatusResponse check(String eventId) {
         AuditRecord record = auditRepository.findForUpdateByEventId(eventId)
                 .orElseThrow(() -> new TransactionNotFoundException(eventId));
-        RecoveryTransactionEligibilityService.RecoveryCheckoutDecision decision =
-                eligibilityService.evaluate(record);
         TransactionRecoveryPaymentLink link = linkRepository
                 .findForUpdateByEventEventId(eventId).orElse(null);
 
@@ -53,17 +51,18 @@ public class TransactionRecoveryStatusService {
                     "No recovery payment has been recorded. Start a recovery Checkout first.",
                     false, RecoveryTransactionEligibilityService.NONE);
         }
-        if (RecoveryTransactionEligibilityService.ABANDONED.equals(decision.existingLinkStatus())) {
-            return response(eventId, "no_payment_recorded",
-                    "No verified payment was recorded for the stale order. Retry Payment to create a fresh order.",
-                    false, RecoveryTransactionEligibilityService.ABANDONED);
-        }
-
         RazorpayTestCheckoutAttempt attempt = attemptRepository
                 .findFirstByInternalRequestIdAndRazorpayOrderIdOrderByIdDesc(
                         link.getInternalRequestId(), link.getRazorpayOrderId()).orElse(null);
         if (attempt == null || !RazorpayCheckoutEventService.SUCCESS.equals(attempt.getEventType())
                 || attempt.getRazorpayPaymentId() == null || attempt.getRazorpaySignature() == null) {
+            RecoveryTransactionEligibilityService.RecoveryCheckoutDecision decision =
+                    eligibilityService.evaluate(record);
+            if (RecoveryTransactionEligibilityService.ABANDONED.equals(decision.existingLinkStatus())) {
+                return response(eventId, "no_payment_recorded",
+                        "No verified payment was recorded for the stale order. Retry Payment to create a fresh order.",
+                        false, RecoveryTransactionEligibilityService.ABANDONED);
+            }
             return response(eventId, "no_payment_recorded",
                     "No completed payment was reported for this order. Resume Checkout or retry after it expires.",
                     false, link.getStatus());

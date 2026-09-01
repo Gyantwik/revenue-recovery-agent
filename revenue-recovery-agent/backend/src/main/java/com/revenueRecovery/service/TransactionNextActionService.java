@@ -45,6 +45,12 @@ public class TransactionNextActionService {
                 ? "not_recovered" : record.getLifecycleState().toJson();
         RecoveryTransactionEligibilityService.RecoveryCheckoutDecision decision =
                 transactionEligibilityService.evaluate(record);
+        // A resumable customer checkout is the effective current state. Reporting the
+        // original policy terminal state here produced the contradictory "Stopped" +
+        // "Resume payment" card even though the link itself was valid and active.
+        if (decision.actionType() == NextActionType.RESUME_RECOVERY_CHECKOUT) {
+            lifecycle = "recovery_payment_pending";
+        }
         return new NextRecoveryActionResponse(record.getEventId(), record.getOutcome(), record.getOutcome(), lifecycle,
                 attempts, maximum, decision.allowed(), decision.recommendedAction(),
                 decision.buttonLabel(), decision.title(), decision.reason(), decision.nextStep(),

@@ -13,6 +13,15 @@ test("network errors reject instead of returning mock transactions", async () =>
   await assert.rejects(getTransactions(), /Unable to connect to the backend/)
 })
 
+test("aborted requests show a retryable timeout error", async () => {
+  globalThis.fetch = async () => { throw new DOMException("Aborted", "AbortError") }
+
+  await assert.rejects(
+    getTransactions(),
+    /Backend request timed out\. Please try again\./,
+  )
+})
+
 test("malformed summary responses are rejected", async () => {
   globalThis.fetch = async () => new Response(JSON.stringify({ total_cases: 65 }), { status: 200 })
   await assert.rejects(getBatchSummary(), /invalid batch summary response/)
