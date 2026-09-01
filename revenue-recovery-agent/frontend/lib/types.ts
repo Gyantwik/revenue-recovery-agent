@@ -4,6 +4,7 @@ export type LifecycleState =
   | "received" | "at_risk" | "classified" | "action_approved"
   | "retry_scheduled" | "verifying_payment" | "recovery_link_sent"
   | "retry_exhausted" | "recovered" | "not_recovered" | "stopped" | "escalated"
+  | "recovered_by_verified_test_payment"
 
 export type AuditActor = "system_simulation" | "merchant_manual"
 
@@ -65,15 +66,22 @@ export type NextRecoveryAction =
   | "AWAIT_SCHEDULED_MANDATE_RETRY"
   | "ESCALATE_AFTER_RETRY_EXHAUSTED"
   | "CUSTOMER_RECOVERY_CHECKOUT"
+  | "RESUME_PAYMENT"
+  | "CHOOSE_ANOTHER_PAYMENT_METHOD"
+  | "TRY_PAYMENT_AGAIN_SECURELY"
+  | "TRY_PAYMENT_AGAIN"
+  | "PAY_MANUALLY"
   | "SEND_RECOVERY_LINK"
   | "SEND_ALT_PAYMENT_LINK"
 
-export type NextActionType = "NONE" | "DISPLAY_INFORMATION" | "OPEN_RECOVERY_CHECKOUT" | "OPEN_TEST_MODE_RECOVERY_CHECKOUT"
+export type NextActionType = "NONE" | "DISPLAY_INFORMATION" | "OPEN_RECOVERY_CHECKOUT"
+  | "RESUME_RECOVERY_CHECKOUT" | "CHECK_PAYMENT_STATUS" | "OPEN_TEST_MODE_RECOVERY_CHECKOUT"
 export type NextActionMode = "synthetic_benchmark" | "razorpay_test_recovery" | "razorpay_test_demo"
 
 export interface NextRecoveryActionDecision {
   event_id: string
   current_outcome: TransactionOutcome
+  outcome: TransactionOutcome
   lifecycle_state: string
   attempts_made: number
   max_attempts: number
@@ -85,6 +93,12 @@ export interface NextRecoveryActionDecision {
   next_step: string
   risk_note: string
   action_type: NextActionType
+  secondary_action_type: NextActionType | null
+  secondary_button_label: string | null
+  existing_link_status: "none" | "order_created" | "checkout_opened"
+    | "client_reported_unverified" | "abandoned" | "verified_test_payment"
+    | "recovered_by_verified_test_payment" | "verification_failed" | "recovered"
+  link_age_minutes: number
   mode: NextActionMode
 }
 
@@ -204,7 +218,17 @@ export interface TransactionRecoveryOrder {
   currency: "INR"
   receipt: string
   recovery_action: RecoveryCheckoutAction
+  link_status: "order_created" | "checkout_opened" | "client_reported_unverified"
   recovery_status: "awaiting_customer_payment"
+  mode: "test"
+}
+
+export interface TransactionRecoveryStatus {
+  event_id: string
+  status: "no_payment_recorded" | "verification_failed" | "recovered"
+  message: string
+  is_recovered: boolean
+  link_status: string
   mode: "test"
 }
 

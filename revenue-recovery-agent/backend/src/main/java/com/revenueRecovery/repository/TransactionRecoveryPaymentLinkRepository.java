@@ -17,6 +17,11 @@ public interface TransactionRecoveryPaymentLinkRepository
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from TransactionRecoveryPaymentLink l join fetch l.event "
+            + "where l.event.eventId = :eventId")
+    Optional<TransactionRecoveryPaymentLink> findForUpdateByEventEventId(@Param("eventId") String eventId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select l from TransactionRecoveryPaymentLink l join fetch l.event "
             + "where l.internalRequestId = :requestId")
     Optional<TransactionRecoveryPaymentLink> findForUpdateByInternalRequestId(
             @Param("requestId") String requestId);

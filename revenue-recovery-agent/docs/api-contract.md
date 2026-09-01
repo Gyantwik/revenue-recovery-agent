@@ -1,6 +1,6 @@
 # RecoverAI API Contract
 
-RecoverAI is a synthetic/test-mode demonstration. The Razorpay demo opens Razorpay's sandbox Checkout; no real money moves. Recovery endpoints remain simulations and do not initiate a bank request, mandate debit, or customer message.
+RecoverAI is a synthetic/Test Mode demonstration. Razorpay-hosted sandbox Checkout can create transaction-linked Test Mode orders; no real money moves and no Live Mode, capture, settlement, mandate debit, or customer message is performed.
 
 The backend listens on `http://localhost:8080` by default. The Next.js server uses that URL unless `NEXT_PUBLIC_API_BASE_URL` overrides it. JSON property names and enum values use lowercase `snake_case`.
 
@@ -95,8 +95,9 @@ Status meanings:
 | `checkout_opened` | Razorpay Test Mode Checkout was opened locally in the browser. |
 | `client_reported_unverified` | The browser reported success, failure, or dismissal; the report is not authenticated or payment-confirming. |
 | `verified_test_payment` | Server-side HMAC authenticated the Test Mode callback. This is not capture, settlement, or recovery. |
-| `verification_failed` | Signature verification failed. This implementation treats the result as terminal. |
-| `recovered_by_verified_test_payment` | The dedicated demo case was atomically recovered after valid Test Mode signature verification. This is not a capture or settlement claim. |
+| `verification_failed` | Signature verification failed. A normal transaction link becomes retryable; no recovery is recorded. |
+| `abandoned` | The unverified transaction order is stale (30 minutes or older) and may be replaced by a fresh order. |
+| `recovered_by_verified_test_payment` | A linked demo or normal transaction was atomically recovered after valid Test Mode signature verification. This is not a capture or settlement claim. |
 
 The `/razorpay-test` page uses synthetic prefill data, dynamically loads Razorpay-hosted Checkout once, and never collects payment instrument data itself. Checkout orders and attempts are separate from the recovery pipeline, batch totals, and recovery audit history.
 
@@ -246,7 +247,7 @@ Outcomes: `recovered`, `not_recovered`, `escalated`, `stopped_correctly`.
 - Errors: unexpected processing failures return `500` with `{"error":"Internal server error"}`.
 - Frontend consumer: batch execution clients; the dashboard subsequently reads the same persisted summary and records.
 
-## GET `/api/batch-summary`
+## GET `/api/batch-summary` or `/api/batch/summary`
 
 - Request: no body or query parameters.
 - Success: `200 OK` with:
@@ -289,19 +290,24 @@ Returns a read-only, policy-derived explanation of the current state and exactly
 ```json
 {
   "event_id": "TXN10059",
+  "outcome": "not_recovered",
   "current_outcome": "not_recovered",
   "lifecycle_state": "retry_exhausted",
   "attempts_made": 2,
   "max_attempts": 2,
   "is_action_allowed": true,
-  "recommended_action": "ESCALATE_AFTER_RETRY_EXHAUSTED",
-  "button_label": "Review Mandate / Escalate",
-  "title": "Automatic retries are exhausted",
-  "reason": "This mandate retry has reached its maximum of 2 attempts. Further automatic retries are blocked.",
-  "next_step": "Review the mandate or escalate the case for manual resolution.",
-  "risk_note": "Do not initiate another automatic debit attempt.",
-  "action_type": "DISPLAY_INFORMATION",
-  "mode": "synthetic_benchmark"
+  "recommended_action": "PAY_MANUALLY",
+  "button_label": "Pay Manually",
+  "title": "A voluntary one-time payment is available",
+  "reason": "Mandate retries are exhausted; this is not another mandate debit.",
+  "next_step": "Open Razorpay Test Mode Checkout for a voluntary customer payment.",
+  "risk_note": "The transaction is recovered only after backend signature verification.",
+  "action_type": "OPEN_RECOVERY_CHECKOUT",
+  "secondary_action_type": null,
+  "secondary_button_label": null,
+  "existing_link_status": "none",
+  "link_age_minutes": 0,
+  "mode": "razorpay_test_recovery"
 }
 ```
 
@@ -313,8 +319,10 @@ Stable `action_type` values:
 | `DISPLAY_INFORMATION` | Shows/acknowledges guidance in the browser only. No backend mutation occurs. |
 | `OPEN_TEST_MODE_RECOVERY_CHECKOUT` | Navigates only the dedicated demo case to the existing Razorpay Test Mode recovery flow. |
 | `OPEN_RECOVERY_CHECKOUT` | Creates a linked, customer-initiated Test Mode recovery Checkout after the backend rechecks transaction eligibility. |
+| `RESUME_RECOVERY_CHECKOUT` | Reopens the same active linked order when it is less than 30 minutes old. |
+| `CHECK_PAYMENT_STATUS` | Secondary action that reconciles a stored checkout-success attempt without client-supplied payment identifiers. |
 
-Stable `recommended_action` values include `ALREADY_RECOVERED`, `STOPPED_BY_POLICY`, `ESCALATE_TO_MERCHANT`, `ESCALATE_MANDATE_RENEWAL`, `VERIFY_PAYMENT_STATUS`, `AWAIT_SCHEDULED_RETRY`, `AWAIT_SCHEDULED_MANDATE_RETRY`, `ESCALATE_AFTER_RETRY_EXHAUSTED`, `SEND_RECOVERY_LINK`, `SEND_ALT_PAYMENT_LINK`, and `CUSTOMER_RECOVERY_CHECKOUT`. Modes are `synthetic_benchmark`, `razorpay_test_demo`, and `razorpay_test_recovery`.
+Transaction-recovery recommendations include `RESUME_PAYMENT`, `CHOOSE_ANOTHER_PAYMENT_METHOD`, `TRY_PAYMENT_AGAIN_SECURELY`, `TRY_PAYMENT_AGAIN`, and `PAY_MANUALLY`, plus the existing terminal, scheduled, verification, and escalation recommendations. Normal persisted transactions use `razorpay_test_recovery`; the standalone demo alone uses `razorpay_test_demo`.
 
 Policy behavior:
 
@@ -344,18 +352,40 @@ Creates at most one policy-approved Razorpay Test Mode order explicitly linked t
   "currency": "INR",
   "receipt": "recoverai_...",
   "recovery_action": "RESUME_PAYMENT",
+  "link_status": "order_created",
   "recovery_status": "awaiting_customer_payment",
   "mode": "test"
 }
 ```
 
-Eligible unrecovered categories are checkout abandoned (**Resume Payment**), insufficient balance (**Choose Another Payment Method**), incorrect PIN/auth failure (**Try Payment Again Securely**, while automatic retry stays blocked), bank temporary error after automatic retries are exhausted (**Try Payment Again**), and retryable mandate failure after mandate retries are exhausted (**Pay Manually**). Mandate-expired/revoked cases could only use a voluntary manual-payment policy with appropriate consent context; the current dataset records are escalated, so the escalated-state guard blocks Checkout.
+Eligible unrecovered categories are checkout abandoned (**Resume Payment**), insufficient balance (**Choose Another Payment Method**), incorrect PIN/auth failure (**Try Payment Again Securely**, while automatic retry stays blocked), bank temporary error after automatic retries are exhausted (**Try Payment Again**), retryable mandate failure after mandate retries are exhausted (**Pay Manually**), and non-escalated mandate-expired/revoked cases (**Pay Manually**). The current seeded mandate-expired records are already escalated, so the global escalated-state guard blocks them.
 
-Payment pending is blocked until the original payment status is verified. Weak network/client timeout is blocked until the previous attempt is confirmed failed. User cancellation, merchant/gateway issues, unknown/manual review, recovered records, escalated records, retries that are still scheduled, and records with an active or verified link are also blocked. Policy rejection returns a safe `409`; an unknown event returns `404`.
+Payment pending is blocked until the original payment status is verified. Weak network/client timeout is blocked until the previous attempt is confirmed failed. User cancellation, merchant/gateway issues, unknown/manual review, recovered records, escalated records, and retries that are still scheduled are blocked. An active link is not a dead end: for its first 30 minutes the endpoint returns the same order and next-action returns `RESUME_RECOVERY_CHECKOUT` plus secondary `CHECK_PAYMENT_STATUS`. At 30 minutes an unverified link is marked `abandoned`; the next click creates a fresh order by updating the event's single unique link row. Policy rejection returns a safe `409`; an unknown event returns `404`.
 
 The link is persisted independently from the dedicated demo link, with unique event, internal-request, order, and payment identifiers. Checkout intake changes only the link to `client_reported_unverified`. A valid call to `POST /api/razorpay/test/verify-payment` then locks the order, attempt, link, event, and audit record and atomically sets the transaction outcome to `recovered`, sets recovered amount from persisted money, appends exactly one audit-history entry, and sets the link to `recovered_by_verified_test_payment`. A failure rolls the transaction back; invalid or repeated verification cannot double-count revenue or append a second successful audit entry.
 
 An **automatic retry** is a policy-scheduled system attempt. A **customer-initiated retry** is a voluntary hosted-Checkout attempt after an eligible failure. A **recovery Checkout** is the linked Razorpay Test Mode order and browser flow. A **verified recovery** exists only after backend HMAC verification and is the only stage that updates transaction and dashboard recovery metrics. No Live Mode, real charge, capture, settlement, payout, or refund is performed.
+
+## POST `/api/transactions/{eventId}/recovery-checkout/status-check`
+
+Manually reconciles the event's current non-terminal recovery link using only the order/payment attempt already stored server-side; the request has no body and cannot supply an amount, order ID, payment ID, or signature. A stored successful callback with a valid HMAC runs the same atomic finalization as the automatic verification path. If no successful payment was reported, the response is explicit and leaves the transaction resumable or retryable:
+
+```json
+{
+  "event_id": "TXN10044",
+  "status": "no_payment_recorded",
+  "message": "No completed payment was reported for this order. Resume Checkout or retry after it expires.",
+  "is_recovered": false,
+  "link_status": "checkout_opened",
+  "mode": "test"
+}
+```
+
+Successful reconciliation returns `status=recovered` and `is_recovered=true`. The transaction outcome, recovered amount, lifecycle, append-only audit entry, and link finalization commit atomically and idempotently.
+
+## Startup seed and live summary behavior
+
+The default database is file-based H2 at `./data/revenuedb`. On startup the canonical 65-event dataset is loaded only when both `event` and `audit_record` are empty. If either contains live data, startup skips seeding: restarts never wipe, duplicate, or revert verified recoveries. `GET /api/transactions`, transaction detail, and both summary aliases read current persistence on every call. After verified recovery, total and per-root-cause recovered amounts and recovery rates therefore reflect the changed transaction immediately.
 
 ## Synthetic action endpoints
 

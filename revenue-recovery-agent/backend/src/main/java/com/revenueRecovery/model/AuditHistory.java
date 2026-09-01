@@ -18,8 +18,8 @@ public class AuditHistory {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     @Column(name = "event_id", nullable = false, length = 50) private String eventId;
     @Column(nullable = false, columnDefinition = "TIMESTAMP") private Instant timestamp;
-    @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.VARCHAR) @Column(name = "previous_state", length = 30) private LifecycleState previousState;
-    @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.VARCHAR) @Column(name = "new_state", nullable = false, length = 30) private LifecycleState newState;
+    @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.VARCHAR) @Column(name = "previous_state", length = 50) private LifecycleState previousState;
+    @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.VARCHAR) @Column(name = "new_state", nullable = false, length = 50) private LifecycleState newState;
     @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.VARCHAR) @Column(name = "root_cause", length = 50) private RootCause rootCause;
     @Column(name = "classification_confidence", precision = 4, scale = 3) private BigDecimal classificationConfidence;
     @Column(name = "policy_rule_matched", length = 200) private String policyRuleMatched;

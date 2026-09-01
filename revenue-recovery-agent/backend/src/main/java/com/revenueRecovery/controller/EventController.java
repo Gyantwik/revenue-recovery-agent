@@ -3,10 +3,12 @@ package com.revenueRecovery.controller;
 import com.revenueRecovery.controller.dto.AuditRecordResponse;
 import com.revenueRecovery.controller.dto.NextRecoveryActionResponse;
 import com.revenueRecovery.controller.dto.TransactionRecoveryOrderResponse;
+import com.revenueRecovery.controller.dto.TransactionRecoveryStatusResponse;
 import com.revenueRecovery.repository.AuditRecordRepository;
 import com.revenueRecovery.repository.AuditHistoryRepository;
 import com.revenueRecovery.service.TransactionNextActionService;
 import com.revenueRecovery.service.TransactionRecoveryCheckoutService;
+import com.revenueRecovery.service.TransactionRecoveryStatusService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,15 +30,18 @@ public class EventController {
     private final AuditHistoryRepository auditHistoryRepository;
     private final TransactionNextActionService nextActionService;
     private final TransactionRecoveryCheckoutService recoveryCheckoutService;
+    private final TransactionRecoveryStatusService recoveryStatusService;
 
     public EventController(AuditRecordRepository auditRecordRepository,
             AuditHistoryRepository auditHistoryRepository,
             TransactionNextActionService nextActionService,
-            TransactionRecoveryCheckoutService recoveryCheckoutService) {
+            TransactionRecoveryCheckoutService recoveryCheckoutService,
+            TransactionRecoveryStatusService recoveryStatusService) {
         this.auditRecordRepository = auditRecordRepository;
         this.auditHistoryRepository = auditHistoryRepository;
         this.nextActionService = nextActionService;
         this.recoveryCheckoutService = recoveryCheckoutService;
+        this.recoveryStatusService = recoveryStatusService;
     }
 
     @GetMapping("/{eventId}/next-action")
@@ -46,7 +51,12 @@ public class EventController {
 
     @PostMapping("/{eventId}/recovery-checkout")
     public TransactionRecoveryOrderResponse createRecoveryCheckout(@PathVariable String eventId) {
-        return recoveryCheckoutService.create(eventId);
+        return recoveryCheckoutService.createOrResume(eventId);
+    }
+
+    @PostMapping("/{eventId}/recovery-checkout/status-check")
+    public TransactionRecoveryStatusResponse checkRecoveryStatus(@PathVariable String eventId) {
+        return recoveryStatusService.check(eventId);
     }
 
     @GetMapping("/{eventId}")

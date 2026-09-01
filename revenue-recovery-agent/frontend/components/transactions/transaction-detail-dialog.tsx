@@ -16,6 +16,7 @@ import type { NextRecoveryActionDecision, Transaction } from "@/lib/types"
 import { ACTION_LABELS, CASE_TYPE_LABELS } from "@/lib/labels"
 import {
   createTransactionRecoveryCheckout,
+  checkTransactionRecoveryStatus,
   getNextRecoveryAction,
   getRazorpayTestConfig,
   getTransaction,
@@ -56,6 +57,16 @@ export function TransactionDetailDialog({
   const [recoveryState, setRecoveryState] = useState<TransactionRecoveryFlowState | null>(null)
   const [recoveryRunning, setRecoveryRunning] = useState(false)
 
+  const refreshTransactionState = async (eventId: string) => {
+    const [updated, updatedDecision] = await Promise.all([
+      getTransaction(eventId),
+      getNextRecoveryAction(eventId),
+    ])
+    onTransactionUpdated(updated)
+    setDecision(updatedDecision)
+    router.refresh()
+  }
+
   useEffect(() => {
     if (!open || !transaction) return
     let active = true
@@ -91,11 +102,15 @@ export function TransactionDetailDialog({
             if (!window.Razorpay) throw new Error("Razorpay Checkout is unavailable")
             return new window.Razorpay(options)
           },
-          onState: setRecoveryState,
+          onState: state => {
+            setRecoveryState(state)
+            if (["client_reported_unverified", "verification_failed"].includes(state.status)) {
+              void getNextRecoveryAction(transaction.event_id).then(setDecision)
+            }
+          },
           onRecovered: recovered => {
             onTransactionUpdated(recovered)
-            void getNextRecoveryAction(recovered.event_id).then(setDecision)
-            router.refresh()
+            void refreshTransactionState(recovered.event_id)
           },
         },
       ))
@@ -105,6 +120,27 @@ export function TransactionDetailDialog({
     } catch (error) {
       setRecoveryState({
         message: error instanceof Error ? error.message : "Recovery Checkout could not be opened.",
+        status: "error",
+      })
+    } finally {
+      setRecoveryRunning(false)
+    }
+  }
+
+  const handleStatusCheck = async () => {
+    if (!transaction || recoveryRunning) return
+    setRecoveryRunning(true)
+    try {
+      const status = await checkTransactionRecoveryStatus(transaction.event_id)
+      setRecoveryState({
+        message: status.message,
+        status: status.is_recovered ? "recovered_by_verified_test_payment"
+          : status.status === "verification_failed" ? "verification_failed" : "client_reported_unverified",
+      })
+      await refreshTransactionState(transaction.event_id)
+    } catch (error) {
+      setRecoveryState({
+        message: error instanceof Error ? error.message : "Payment status could not be checked.",
         status: "error",
       })
     } finally {
@@ -201,8 +237,9 @@ export function TransactionDetailDialog({
                   onAcknowledge={() => setInformationAcknowledged(true)}
                   recoveryRunning={recoveryRunning}
                   onRecoveryCheckout={() => { void handleRecoveryCheckout() }}
+                  onStatusCheck={() => { void handleStatusCheck() }}
                 />
-                {decision.action_type === "OPEN_RECOVERY_CHECKOUT" && (
+                {["OPEN_RECOVERY_CHECKOUT", "RESUME_RECOVERY_CHECKOUT"].includes(decision.action_type) && (
                   <p className="text-xs text-muted-foreground">
                     Razorpay Test Mode — no real money is charged. The customer must voluntarily complete Checkout.
                   </p>
@@ -329,23 +366,33 @@ function DecisionButton({
   onAcknowledge,
   recoveryRunning,
   onRecoveryCheckout,
+  onStatusCheck,
 }: {
   decision: NextRecoveryActionDecision
   acknowledged: boolean
   onAcknowledge: () => void
   recoveryRunning: boolean
   onRecoveryCheckout: () => void
+  onStatusCheck: () => void
 }) {
   const interaction = getNextActionInteraction(decision)
   const demoHref = getRecoveryDemoHref(decision)
 
   if (interaction === "recovery_checkout") {
     return (
-      <Button type="button" size="sm" className="gap-1.5 text-xs"
-        disabled={recoveryRunning} onClick={onRecoveryCheckout}>
-        {recoveryRunning && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-        {decision.button_label}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" className="gap-1.5 text-xs"
+          disabled={recoveryRunning} onClick={onRecoveryCheckout}>
+          {recoveryRunning && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {decision.button_label}
+        </Button>
+        {decision.secondary_action_type === "CHECK_PAYMENT_STATUS" && (
+          <Button type="button" variant="outline" size="sm" className="text-xs"
+            disabled={recoveryRunning} onClick={onStatusCheck}>
+            {decision.secondary_button_label ?? "Check Payment Status"}
+          </Button>
+        )}
+      </div>
     )
   }
 

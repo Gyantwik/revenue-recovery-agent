@@ -26,8 +26,8 @@ public class TransactionNextActionService {
         this.transactionEligibilityService = transactionEligibilityService;
     }
 
-    /** Read-only by design: asking what is safe must never execute or acknowledge an action. */
-    @Transactional(readOnly = true)
+    /** A read may expire a stale link to prevent an unrecoverable pending state. */
+    @Transactional
     public NextRecoveryActionResponse decide(String eventId) {
         AuditRecord benchmarkRecord = auditRecordRepository.findByEventId(eventId).orElse(null);
         if (benchmarkRecord != null) return decideBenchmark(benchmarkRecord);
@@ -45,32 +45,34 @@ public class TransactionNextActionService {
                 ? "not_recovered" : record.getLifecycleState().toJson();
         RecoveryTransactionEligibilityService.RecoveryCheckoutDecision decision =
                 transactionEligibilityService.evaluate(record);
-        return new NextRecoveryActionResponse(record.getEventId(), record.getOutcome(), lifecycle,
+        return new NextRecoveryActionResponse(record.getEventId(), record.getOutcome(), record.getOutcome(), lifecycle,
                 attempts, maximum, decision.allowed(), decision.recommendedAction(),
                 decision.buttonLabel(), decision.title(), decision.reason(), decision.nextStep(),
-                decision.riskNote(), decision.allowed() ? NextActionType.OPEN_RECOVERY_CHECKOUT : NextActionType.NONE,
-                decision.allowed() ? NextActionMode.RAZORPAY_TEST_RECOVERY : NextActionMode.SYNTHETIC_BENCHMARK);
+                decision.riskNote(), decision.actionType(), decision.secondaryActionType(),
+                decision.secondaryButtonLabel(), decision.existingLinkStatus(), decision.linkAgeMinutes(),
+                NextActionMode.RAZORPAY_TEST_RECOVERY);
     }
 
     private NextRecoveryActionResponse decideDemo(RecoveryDemoCase recoveryCase) {
         if (recoveryCase.getOutcome() == Outcome.RECOVERED
                 || "recovered".equals(recoveryCase.getRecoveryStatus())) {
-            return new NextRecoveryActionResponse(recoveryCase.getEventId(), Outcome.RECOVERED,
+            return new NextRecoveryActionResponse(recoveryCase.getEventId(), Outcome.RECOVERED, Outcome.RECOVERED,
                     "recovered", 1, 1, false, NextRecoveryAction.ALREADY_RECOVERED,
                     "Already Recovered", "Recovered via verified Razorpay Test Mode payment",
                     "Verified Test Mode recovery was completed; the append-only audit history contains the result.",
                     "Review the verified recovery status and audit trail.",
                     "Do not initiate another payment for this recovered demo case.",
-                    NextActionType.NONE, NextActionMode.RAZORPAY_TEST_DEMO);
+                    NextActionType.NONE, null, null, "recovered", 0, NextActionMode.RAZORPAY_TEST_DEMO);
         }
 
-        return new NextRecoveryActionResponse(recoveryCase.getEventId(), Outcome.NOT_RECOVERED,
+        return new NextRecoveryActionResponse(recoveryCase.getEventId(), Outcome.NOT_RECOVERED, Outcome.NOT_RECOVERED,
                 recoveryCase.getRecoveryStatus(), 0, 1, true, NextRecoveryAction.SEND_RECOVERY_LINK,
                 "Open Test Mode Recovery Checkout", "Recovery payment link is available",
                 "This checkout-abandonment case is eligible for one customer-initiated Test Mode recovery payment link.",
                 "Open Razorpay Test Mode Checkout. The case changes only after server-side payment verification.",
                 "Test Mode only. No real money is charged, and an unverified callback cannot recover the case.",
-                NextActionType.OPEN_TEST_MODE_RECOVERY_CHECKOUT, NextActionMode.RAZORPAY_TEST_DEMO);
+                NextActionType.OPEN_TEST_MODE_RECOVERY_CHECKOUT, null, null, "none", 0,
+                NextActionMode.RAZORPAY_TEST_DEMO);
     }
 
     private int value(Integer value) {

@@ -13,6 +13,7 @@ import type {
   NextRecoveryActionDecision,
   Transaction,
   TransactionRecoveryOrder,
+  TransactionRecoveryStatus,
 } from "@/lib/types"
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080")
@@ -148,11 +149,15 @@ export async function getNextRecoveryAction(eventId: string): Promise<NextRecove
     "ALREADY_RECOVERED", "STOPPED_BY_POLICY", "ESCALATE_TO_MERCHANT",
     "ESCALATE_MANDATE_RENEWAL", "VERIFY_PAYMENT_STATUS", "AWAIT_SCHEDULED_RETRY",
     "AWAIT_SCHEDULED_MANDATE_RETRY", "ESCALATE_AFTER_RETRY_EXHAUSTED",
-    "CUSTOMER_RECOVERY_CHECKOUT", "SEND_RECOVERY_LINK", "SEND_ALT_PAYMENT_LINK",
+    "CUSTOMER_RECOVERY_CHECKOUT", "RESUME_PAYMENT", "CHOOSE_ANOTHER_PAYMENT_METHOD",
+    "TRY_PAYMENT_AGAIN_SECURELY", "TRY_PAYMENT_AGAIN", "PAY_MANUALLY",
+    "SEND_RECOVERY_LINK", "SEND_ALT_PAYMENT_LINK",
   ]
-  const actionTypes = ["NONE", "DISPLAY_INFORMATION", "OPEN_RECOVERY_CHECKOUT", "OPEN_TEST_MODE_RECOVERY_CHECKOUT"]
+  const actionTypes = ["NONE", "DISPLAY_INFORMATION", "OPEN_RECOVERY_CHECKOUT",
+    "RESUME_RECOVERY_CHECKOUT", "CHECK_PAYMENT_STATUS", "OPEN_TEST_MODE_RECOVERY_CHECKOUT"]
   if (decision.event_id !== eventId
     || typeof decision.current_outcome !== "string"
+    || typeof decision.outcome !== "string"
     || typeof decision.lifecycle_state !== "string"
     || !isFiniteNumber(decision.attempts_made)
     || !isFiniteNumber(decision.max_attempts)
@@ -164,6 +169,10 @@ export async function getNextRecoveryAction(eventId: string): Promise<NextRecove
     || typeof decision.next_step !== "string"
     || typeof decision.risk_note !== "string"
     || !actionTypes.includes(decision.action_type ?? "")
+    || (decision.secondary_action_type != null && !actionTypes.includes(decision.secondary_action_type))
+    || (decision.secondary_button_label != null && typeof decision.secondary_button_label !== "string")
+    || typeof decision.existing_link_status !== "string"
+    || !isFiniteNumber(decision.link_age_minutes)
     || !["synthetic_benchmark", "razorpay_test_recovery", "razorpay_test_demo"].includes(decision.mode ?? "")) {
     throw new ApiError("Backend returned an invalid next-action response")
   }
@@ -189,10 +198,31 @@ export async function createTransactionRecoveryCheckout(
     || typeof order.razorpay_order_id !== "string" || !isFiniteNumber(order.amount)
     || order.currency !== "INR" || typeof order.receipt !== "string"
     || !actions.includes(order.recovery_action ?? "")
+    || !["order_created", "checkout_opened", "client_reported_unverified"].includes(order.link_status ?? "")
     || order.recovery_status !== "awaiting_customer_payment" || order.mode !== "test") {
     throw new ApiError("Backend returned an invalid transaction recovery order")
   }
   return order as TransactionRecoveryOrder
+}
+
+export async function checkTransactionRecoveryStatus(
+  eventId: string,
+): Promise<TransactionRecoveryStatus> {
+  const body = await requestJson(
+    `/api/transactions/${encodeURIComponent(eventId)}/recovery-checkout/status-check`,
+    { method: "POST" },
+  )
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid recovery status response")
+  }
+  const result = body as Partial<TransactionRecoveryStatus>
+  if (result.event_id !== eventId
+    || !["no_payment_recorded", "verification_failed", "recovered"].includes(result.status ?? "")
+    || typeof result.message !== "string" || typeof result.is_recovered !== "boolean"
+    || typeof result.link_status !== "string" || result.mode !== "test") {
+    throw new ApiError("Backend returned an invalid recovery status response")
+  }
+  return result as TransactionRecoveryStatus
 }
 
 const ACTION_PATHS = {

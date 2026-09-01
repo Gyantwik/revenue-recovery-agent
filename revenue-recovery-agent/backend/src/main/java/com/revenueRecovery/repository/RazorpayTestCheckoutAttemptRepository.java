@@ -11,4 +11,6 @@ public interface RazorpayTestCheckoutAttemptRepository extends JpaRepository<Raz
             String internalRequestId, String razorpayOrderId, String razorpayPaymentId);
     Optional<RazorpayTestCheckoutAttempt> findFirstByRazorpayOrderIdAndStatus(
             String razorpayOrderId, String status);
+    Optional<RazorpayTestCheckoutAttempt> findFirstByInternalRequestIdAndRazorpayOrderIdOrderByIdDesc(
+            String internalRequestId, String razorpayOrderId);
 }

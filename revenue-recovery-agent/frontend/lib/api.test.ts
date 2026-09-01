@@ -74,6 +74,7 @@ test("next-action client loads the backend-owned decision without posting an act
     return new Response(JSON.stringify({
       event_id: "TXN10059",
       current_outcome: "not_recovered",
+      outcome: "not_recovered",
       lifecycle_state: "retry_exhausted",
       attempts_made: 2,
       max_attempts: 2,
@@ -85,6 +86,10 @@ test("next-action client loads the backend-owned decision without posting an act
       next_step: "Review the mandate.",
       risk_note: "Do not initiate another automatic debit attempt.",
       action_type: "DISPLAY_INFORMATION",
+      secondary_action_type: null,
+      secondary_button_label: null,
+      existing_link_status: "none",
+      link_age_minutes: 0,
       mode: "synthetic_benchmark",
     }), { status: 200 })
   }

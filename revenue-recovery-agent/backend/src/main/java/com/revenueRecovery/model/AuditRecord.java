@@ -88,7 +88,7 @@ public class AuditRecord {
     @JdbcTypeCode(SqlTypes.VARCHAR)
     // Nullable at the schema level so Hibernate can upgrade an existing Phase 2 H2 table;
     // the pipeline immediately backfills and persists a state for every processed record.
-    @Column(name = "lifecycle_state", length = 30)
+    @Column(name = "lifecycle_state", length = 50)
     private LifecycleState lifecycleState = LifecycleState.RECEIVED;
 
     @Column(name = "next_eligible_action_at", columnDefinition = "TIMESTAMP")

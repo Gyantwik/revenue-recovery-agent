@@ -29,14 +29,29 @@ The `/razorpay-test` page also contains a separate **Live Test Mode Recovery Dem
 
 The dedicated demo case is not an `AuditRecord` and is excluded from the **Synthetic Benchmark — 65 seeded cases**. Baseline totals remain 65 cases, ₹191,209 at risk, ₹95,647 recovered, and recovery rate 0.5002. Test Mode only: no real money, capture, settlement, merchant payout, webhook, polling, or Reserve Pay behavior is implemented.
 
-## Policy-aware next recovery decisions
+## Policy-aware transaction recovery
 
-Transaction details load `GET /api/transactions/{eventId}/next-action` and display one backend-owned recommendation with its reason, safe next step, and policy guardrail. The UI intentionally has no generic **Recover Amount** or **Mark Recovered** shortcut.
+Transaction details load `GET /api/transactions/{eventId}/next-action`; eligibility is calculated from each persisted transaction's root cause, outcome, and attempt counts. It is never keyed to a particular event ID. Eligible unrecovered rows are checkout abandonment (**Resume Payment**), insufficient balance (**Choose Another Payment Method**), incorrect PIN (**Try Payment Again Securely**), exhausted bank-error retries (**Try Payment Again**), exhausted retryable-mandate retries (**Pay Manually**), and non-escalated expired mandates (**Pay Manually**). Pending, weak-network, cancelled, merchant/gateway, unknown, scheduled-retry, escalated, and recovered rows remain protected by informational policy states.
 
-Eligible, unrecovered benchmark transactions can open a voluntary Razorpay Test Mode recovery Checkout: checkout abandonment uses **Resume Payment**, insufficient balance uses **Choose Another Payment Method**, incorrect PIN uses **Try Payment Again Securely**, exhausted bank-error retries use **Try Payment Again**, and exhausted mandate retries use **Pay Manually**. An incorrect PIN blocks automatic retry but still permits a customer to voluntarily retry in Razorpay-hosted Checkout. Mandate-expired records in the current dataset are already escalated, so they remain blocked for review.
+`POST /api/transactions/{eventId}/recovery-checkout` accepts no amount or currency. The backend locks the persisted event, rechecks eligibility, derives its INR amount in paise, and creates an explicitly linked Razorpay Test Mode order. The transaction modal opens that order inline in Razorpay-hosted Checkout; it never redirects a normal transaction to the standalone `/razorpay-test` demo.
 
-Payment-pending and weak-network cases require verification of the original payment before another attempt. User-cancelled, merchant/gateway, unknown/manual-review, escalated, already-recovered, scheduled-retry, and already-linked cases cannot create a recovery order. The backend owns these decisions; the browser cannot enable Checkout by changing display strings.
+An unverified order less than 30 minutes old is resumable and reuses the same order. The modal also offers **Check Payment Status** through `POST /api/transactions/{eventId}/recovery-checkout/status-check`. At 30 minutes the backend marks an unverified order `abandoned`, and **Retry Payment** creates a fresh order without creating a second event-link row. A dismissal or failed verification leaves the transaction unrecovered and actionable.
 
-`POST /api/transactions/{eventId}/recovery-checkout` accepts no payment amount or currency. It locks the persisted event, rechecks eligibility, derives INR and paise from the stored transaction, and creates at most one explicitly linked Test Mode order. Clicking the button or receiving a browser callback does not change recovery state. Only successful server-side signature verification atomically marks that transaction recovered, sets its persisted recovered amount, appends one audit entry, and updates dashboard metrics.
+Only successful server-side HMAC verification atomically marks the linked transaction `recovered`, sets `recovered_amount` to its persisted amount, moves lifecycle state to `recovered_by_verified_test_payment`, appends exactly one audit entry, and recomputes dashboard and root-cause totals from current database state. The file-based H2 database is seeded with the canonical 65 events only when both event and audit tables are empty; later restarts preserve all live recovery state.
+
+Eligibility matrix:
+
+| Persisted state | Result |
+| --- | --- |
+| Checkout abandoned, not recovered | Resume Payment |
+| Insufficient balance, not recovered | Choose Another Payment Method |
+| Incorrect PIN, not recovered/stopped | Try Payment Again Securely |
+| Bank temporary error, retry exhausted | Try Payment Again |
+| Retryable mandate failure, retry exhausted | Pay Manually |
+| Expired mandate, not escalated | Pay Manually |
+| Active linked order under 30 minutes | Resume Recovery Payment + Check Payment Status |
+| Stale/failed linked order | Retry Payment with a fresh order |
+| Pending, weak network, cancelled, merchant/gateway, unknown, retry scheduled | Informational/blocked |
+| Recovered or escalated | Permanently blocked from another payment |
 
 Terminology: an **automatic retry** is a policy-scheduled system attempt; a **customer-initiated retry** is a voluntary new attempt after a safe failure such as incorrect PIN; a **recovery Checkout** is the linked Razorpay-hosted Test Mode flow; and **verified recovery** is the persisted state reached only after backend HMAC verification. This demonstration involves no real money, Live Mode, capture, settlement, payout, or refund.

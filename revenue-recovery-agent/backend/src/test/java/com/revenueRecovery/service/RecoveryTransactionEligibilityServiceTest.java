@@ -59,8 +59,8 @@ class RecoveryTransactionEligibilityServiceTest {
         assertBlocked(record(RootCause.USER_CANCELLED, Outcome.STOPPED_CORRECTLY, 0, 0),
                 "No Automatic Recovery Allowed");
         assertBlocked(record(RootCause.MERCHANT_GATEWAY_ISSUE, Outcome.ESCALATED, 0, 0),
-                "Merchant Review Required");
-        assertBlocked(record(RootCause.UNKNOWN, Outcome.ESCALATED, 0, 0), "Manual Review Required");
+                "Escalated for Review");
+        assertBlocked(record(RootCause.UNKNOWN, Outcome.ESCALATED, 0, 0), "Escalated for Review");
         assertBlocked(record(RootCause.MANDATE_EXPIRED, Outcome.ESCALATED, 0, 0), "Escalated for Review");
     }
 

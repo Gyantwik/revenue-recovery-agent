@@ -11,6 +11,7 @@ public record TransactionRecoveryOrderResponse(
         String currency,
         String receipt,
         @JsonProperty("recovery_action") RecoveryCheckoutAction recoveryAction,
+        @JsonProperty("link_status") String linkStatus,
         @JsonProperty("recovery_status") String recoveryStatus,
         String mode) {
 }

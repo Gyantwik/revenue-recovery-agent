@@ -15,12 +15,15 @@ import com.revenueRecovery.repository.TransactionRecoveryPaymentLinkRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.Optional;
 
 @Service
 public class RecoveryPaymentFinalizationService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RecoveryPaymentFinalizationService.class);
     public static final String RECOVERED = "recovered";
     public static final String LINK_RECOVERED = "recovered_by_verified_test_payment";
 
@@ -137,11 +140,13 @@ public class RecoveryPaymentFinalizationService {
         LifecycleState previousState = record.getLifecycleState();
         record.setOutcome(Outcome.RECOVERED);
         record.setRecoveredAmount(record.getAmount());
-        record.setLifecycleState(LifecycleState.RECOVERED);
+        record.setLifecycleState(LifecycleState.RECOVERED_BY_VERIFIED_TEST_PAYMENT);
         record.setStopOrEscalateReason(null);
         transactionLinkRepository.save(link);
         transactionAuditService.appendVerifiedRecovery(record, link, previousState, paymentId, verifiedAt);
         auditRecordRepository.save(record);
+        LOGGER.info("Atomically finalized Test Mode recovery for eventId={}, orderId={}, paymentId={}",
+                record.getEventId(), order.getRazorpayOrderId(), paymentId);
         return Optional.of(new RecoveryFinalizationResult(record.getEventId(), RECOVERED, LINK_RECOVERED));
     }
 

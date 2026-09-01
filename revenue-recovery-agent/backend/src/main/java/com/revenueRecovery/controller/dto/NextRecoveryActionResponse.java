@@ -9,6 +9,7 @@ import com.revenueRecovery.model.enums.Outcome;
 public record NextRecoveryActionResponse(
         @JsonProperty("event_id") String eventId,
         @JsonProperty("current_outcome") Outcome currentOutcome,
+        Outcome outcome,
         @JsonProperty("lifecycle_state") String lifecycleState,
         @JsonProperty("attempts_made") int attemptsMade,
         @JsonProperty("max_attempts") int maxAttempts,
@@ -20,5 +21,9 @@ public record NextRecoveryActionResponse(
         @JsonProperty("next_step") String nextStep,
         @JsonProperty("risk_note") String riskNote,
         @JsonProperty("action_type") NextActionType actionType,
+        @JsonProperty("secondary_action_type") NextActionType secondaryActionType,
+        @JsonProperty("secondary_button_label") String secondaryButtonLabel,
+        @JsonProperty("existing_link_status") String existingLinkStatus,
+        @JsonProperty("link_age_minutes") long linkAgeMinutes,
         NextActionMode mode) {
 }

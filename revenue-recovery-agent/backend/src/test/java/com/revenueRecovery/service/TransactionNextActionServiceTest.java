@@ -60,7 +60,7 @@ class TransactionNextActionServiceTest {
         assertDecision(decide(record("cancelled", RootCause.USER_CANCELLED, Outcome.STOPPED_CORRECTLY,
                 LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.STOPPED_BY_POLICY, NextActionType.NONE, false);
         assertDecision(decide(record("pin", RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY,
-                LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.CUSTOMER_RECOVERY_CHECKOUT,
+                LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.TRY_PAYMENT_AGAIN_SECURELY,
                 NextActionType.OPEN_RECOVERY_CHECKOUT, true);
     }
 
@@ -73,7 +73,7 @@ class TransactionNextActionServiceTest {
                 LifecycleState.ESCALATED, 0, 0)), NextRecoveryAction.ESCALATE_TO_MERCHANT,
                 NextActionType.NONE, false);
         assertDecision(decide(record("mandate-expired", RootCause.MANDATE_EXPIRED, Outcome.ESCALATED,
-                LifecycleState.ESCALATED, 0, 0)), NextRecoveryAction.ESCALATE_MANDATE_RENEWAL,
+                LifecycleState.ESCALATED, 0, 0)), NextRecoveryAction.ESCALATE_TO_MERCHANT,
                 NextActionType.NONE, false);
     }
 
@@ -81,7 +81,7 @@ class TransactionNextActionServiceTest {
     void pendingPaymentOffersStatusVerificationButNeverCheckout() {
         NextRecoveryActionResponse result = decide(record("pending", RootCause.PAYMENT_PENDING,
                 Outcome.ESCALATED, LifecycleState.ESCALATED, 1, 1));
-        assertDecision(result, NextRecoveryAction.VERIFY_PAYMENT_STATUS,
+        assertDecision(result, NextRecoveryAction.ESCALATE_TO_MERCHANT,
                 NextActionType.NONE, false);
     }
 
@@ -111,7 +111,8 @@ class TransactionNextActionServiceTest {
                 RootCause.MANDATE_FAILED_RETRYABLE }) {
             NextRecoveryActionResponse result = decide(record("exhausted-" + cause.name(), cause,
                     Outcome.NOT_RECOVERED, LifecycleState.RETRY_EXHAUSTED, 2, 2));
-            assertDecision(result, NextRecoveryAction.CUSTOMER_RECOVERY_CHECKOUT,
+            assertDecision(result, cause == RootCause.BANK_TEMP_ERROR
+                            ? NextRecoveryAction.TRY_PAYMENT_AGAIN : NextRecoveryAction.PAY_MANUALLY,
                     NextActionType.OPEN_RECOVERY_CHECKOUT, true);
         }
     }
@@ -119,10 +120,10 @@ class TransactionNextActionServiceTest {
     @Test
     void safeBenchmarkCasesOfferCustomerInitiatedCheckout() {
         assertDecision(decide(record("checkout", RootCause.CHECKOUT_ABANDONED, Outcome.NOT_RECOVERED,
-                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.CUSTOMER_RECOVERY_CHECKOUT,
+                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.RESUME_PAYMENT,
                 NextActionType.OPEN_RECOVERY_CHECKOUT, true);
         assertDecision(decide(record("balance", RootCause.INSUFFICIENT_BALANCE, Outcome.NOT_RECOVERED,
-                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.CUSTOMER_RECOVERY_CHECKOUT,
+                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.CHOOSE_ANOTHER_PAYMENT_METHOD,
                 NextActionType.OPEN_RECOVERY_CHECKOUT, true);
     }
 

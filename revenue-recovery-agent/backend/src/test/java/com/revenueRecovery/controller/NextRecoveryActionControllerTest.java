@@ -43,20 +43,20 @@ class NextRecoveryActionControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Transaction not found"));
 
-        assertDecision("TXN10001", "STOPPED_BY_POLICY", "NONE", false, "synthetic_benchmark");
-        assertDecision("TXN10006", "CUSTOMER_RECOVERY_CHECKOUT", "OPEN_RECOVERY_CHECKOUT", true,
+        assertDecision("TXN10001", "STOPPED_BY_POLICY", "NONE", false, "razorpay_test_recovery");
+        assertDecision("TXN10006", "TRY_PAYMENT_AGAIN_SECURELY", "OPEN_RECOVERY_CHECKOUT", true,
                 "razorpay_test_recovery");
-        assertDecision("TXN10010", "ESCALATE_TO_MERCHANT", "NONE", false, "synthetic_benchmark");
-        assertDecision("TXN10029", "VERIFY_PAYMENT_STATUS", "NONE", false, "synthetic_benchmark");
-        assertDecision("TXN10048", "ESCALATE_TO_MERCHANT", "NONE", false, "synthetic_benchmark");
-        assertDecision("TXN10051", "ESCALATE_MANDATE_RENEWAL", "NONE", false, "synthetic_benchmark");
-        assertDecision("TXN10021", "VERIFY_PAYMENT_STATUS", "NONE", false, "synthetic_benchmark");
-        assertDecision("TXN10059", "CUSTOMER_RECOVERY_CHECKOUT", "OPEN_RECOVERY_CHECKOUT", true,
+        assertDecision("TXN10010", "ESCALATE_TO_MERCHANT", "NONE", false, "razorpay_test_recovery");
+        assertDecision("TXN10029", "ESCALATE_TO_MERCHANT", "NONE", false, "razorpay_test_recovery");
+        assertDecision("TXN10048", "ESCALATE_TO_MERCHANT", "NONE", false, "razorpay_test_recovery");
+        assertDecision("TXN10051", "ESCALATE_TO_MERCHANT", "NONE", false, "razorpay_test_recovery");
+        assertDecision("TXN10021", "VERIFY_PAYMENT_STATUS", "NONE", false, "razorpay_test_recovery");
+        assertDecision("TXN10059", "PAY_MANUALLY", "OPEN_RECOVERY_CHECKOUT", true,
                 "razorpay_test_recovery");
         // The deterministic baseline recovered every seeded checkout-abandoned and
         // insufficient-balance row, so the terminal guard correctly takes priority.
-        assertDecision("TXN10045", "ALREADY_RECOVERED", "NONE", false, "synthetic_benchmark");
-        assertDecision("TXN10037", "ALREADY_RECOVERED", "NONE", false, "synthetic_benchmark");
+        assertDecision("TXN10045", "ALREADY_RECOVERED", "NONE", false, "razorpay_test_recovery");
+        assertDecision("TXN10037", "ALREADY_RECOVERED", "NONE", false, "razorpay_test_recovery");
     }
 
     @Test

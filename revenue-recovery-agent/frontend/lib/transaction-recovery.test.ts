@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import test from "node:test"
 import { startTransactionRecoveryFlow, type TransactionRecoveryFlowState } from "./transaction-recovery.ts"
+import { createSingleFlightRunner } from "./razorpay-checkout.ts"
 import type { RazorpayCheckoutEventRequest, Transaction } from "./types.ts"
 
 const eventId = "TXN10044"
@@ -13,6 +14,7 @@ const order = {
   currency: "INR" as const,
   receipt: "recoverai_transaction_recovery",
   recovery_action: "RESUME_PAYMENT" as const,
+  link_status: "order_created" as const,
   recovery_status: "awaiting_customer_payment" as const,
   mode: "test" as const,
 }
@@ -67,21 +69,25 @@ function harness(result: "valid" | "invalid" = "valid") {
 
 test("linked order is requested by event ID only before Checkout opens", async () => {
   const context = harness()
-  await startTransactionRecoveryFlow(eventId, context.dependencies)
+  const flow = startTransactionRecoveryFlow(eventId, context.dependencies)
+  await new Promise(resolve => setTimeout(resolve, 0))
   assert.deepEqual(context.createArgs, [[eventId]])
   assert.ok(context.calls.indexOf("create-order") < context.calls.indexOf("open"))
   assert.equal(context.getOptions()?.amount, 95000)
+  context.getOptions()?.modal.ondismiss()
+  await flow
 })
 
 test("checkout intake precedes verification and verified state refreshes the transaction", async () => {
   const context = harness()
-  await startTransactionRecoveryFlow(eventId, context.dependencies)
+  const flow = startTransactionRecoveryFlow(eventId, context.dependencies)
+  await new Promise(resolve => setTimeout(resolve, 0))
   context.getOptions()?.handler({
     razorpay_order_id: order.razorpay_order_id,
     razorpay_payment_id: "pay_transaction_recovery",
     razorpay_signature: "callback_signature_fixture",
   })
-  await new Promise(resolve => setTimeout(resolve, 0))
+  await flow
   assert.ok(context.calls.indexOf("record-event") < context.calls.indexOf("verify"))
   assert.ok(context.calls.indexOf("verify") < context.calls.indexOf("get-transaction"))
   assert.equal(context.recovered.length, 1)
@@ -90,22 +96,37 @@ test("checkout intake precedes verification and verified state refreshes the tra
 
 test("dismissal and invalid verification never report recovery", async () => {
   const dismissed = harness()
-  await startTransactionRecoveryFlow(eventId, dismissed.dependencies)
-  dismissed.getOptions()?.modal.ondismiss()
+  const dismissedFlow = startTransactionRecoveryFlow(eventId, dismissed.dependencies)
   await new Promise(resolve => setTimeout(resolve, 0))
+  dismissed.getOptions()?.modal.ondismiss()
+  await dismissedFlow
   assert.equal(dismissed.recovered.length, 0)
   assert.match(dismissed.states.at(-1)?.message ?? "", /remains unrecovered/i)
 
   const invalid = harness("invalid")
-  await startTransactionRecoveryFlow(eventId, invalid.dependencies)
+  const invalidFlow = startTransactionRecoveryFlow(eventId, invalid.dependencies)
+  await new Promise(resolve => setTimeout(resolve, 0))
   invalid.getOptions()?.handler({
     razorpay_order_id: order.razorpay_order_id,
     razorpay_payment_id: "pay_transaction_recovery",
     razorpay_signature: "invalid_callback_fixture",
   })
-  await new Promise(resolve => setTimeout(resolve, 0))
+  await invalidFlow
   assert.equal(invalid.recovered.length, 0)
   assert.match(invalid.states.at(-1)?.message ?? "", /was not changed/i)
+})
+
+test("single-flight remains locked for the entire inline Checkout session", async () => {
+  const context = harness()
+  const runner = createSingleFlightRunner()
+  const first = runner(() => startTransactionRecoveryFlow(eventId, context.dependencies))
+  await new Promise(resolve => setTimeout(resolve, 0))
+  const second = await runner(() => startTransactionRecoveryFlow(eventId, context.dependencies))
+  assert.equal(second, false)
+  assert.equal(context.calls.filter(call => call === "create-order").length, 1)
+  assert.equal(context.calls.filter(call => call === "open").length, 1)
+  context.getOptions()?.modal.ondismiss()
+  assert.equal(await first, true)
 })
 
 test("transaction modal uses backend eligibility and contains no generic recovery shortcut", async () => {
@@ -113,5 +134,7 @@ test("transaction modal uses backend eligibility and contains no generic recover
   assert.match(source, /createTransactionRecoveryCheckout/)
   assert.match(source, /Razorpay Test Mode — no real money is charged/)
   assert.match(source, /router\.refresh\(\)/)
+  assert.match(source, /checkTransactionRecoveryStatus/)
+  assert.match(source, /onTransactionUpdated/)
   assert.doesNotMatch(source, /Recover Amount|Mark Recovered|Force Payment|Auto Debit/)
 })

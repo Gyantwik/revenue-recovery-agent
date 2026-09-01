@@ -10,6 +10,8 @@ import com.revenueRecovery.repository.RazorpayTestOrderRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -21,6 +23,7 @@ import java.util.HexFormat;
 
 @Service
 public class RazorpaySignatureVerificationService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RazorpaySignatureVerificationService.class);
     public static final String VERIFIED = "verified_test_payment";
     public static final String FAILED = "verification_failed";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
@@ -74,6 +77,8 @@ public class RazorpaySignatureVerificationService {
                 request.razorpaySignature(), properties.getKeySecret());
 
         if (!hmacMatches) {
+            LOGGER.warn("Test Mode signature verification failed for requestId={}, orderId={}, paymentId={}",
+                    request.internalRequestId(), order.getRazorpayOrderId(), request.razorpayPaymentId());
             attempt.setStatus(FAILED);
             attempt.setVerificationFailureCode(FAILURE_CODE);
             attempt.setRazorpaySignature(null);
@@ -87,6 +92,8 @@ public class RazorpaySignatureVerificationService {
         }
 
         Instant verifiedAt = Instant.now();
+        LOGGER.info("Test Mode signature verified for requestId={}, orderId={}, paymentId={}",
+                request.internalRequestId(), order.getRazorpayOrderId(), request.razorpayPaymentId());
         attempt.setStatus(VERIFIED);
         attempt.setVerifiedAt(verifiedAt);
         attempt.setVerificationFailureCode(null);

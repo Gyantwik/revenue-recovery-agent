@@ -30,7 +30,7 @@ public class BatchController {
         return batchSummaryService.summarize();
     }
 
-    @GetMapping("/batch-summary")
+    @GetMapping({"/batch-summary", "/batch/summary"})
     public BatchSummaryResponse getBatchSummary() {
         return batchSummaryService.summarize();
     }

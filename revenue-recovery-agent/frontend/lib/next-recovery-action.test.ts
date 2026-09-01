@@ -8,6 +8,7 @@ function decision(overrides: Partial<NextRecoveryActionDecision>): NextRecoveryA
   return {
     event_id: "TXN10059",
     current_outcome: "not_recovered",
+    outcome: "not_recovered",
     lifecycle_state: "retry_exhausted",
     attempts_made: 2,
     max_attempts: 2,
@@ -19,6 +20,10 @@ function decision(overrides: Partial<NextRecoveryActionDecision>): NextRecoveryA
     next_step: "Open hosted Test Mode Checkout.",
     risk_note: "Recovery requires backend signature verification.",
     action_type: "OPEN_RECOVERY_CHECKOUT",
+    secondary_action_type: null,
+    secondary_button_label: null,
+    existing_link_status: "none",
+    link_age_minutes: 0,
     mode: "razorpay_test_recovery",
     ...overrides,
   }
@@ -29,6 +34,63 @@ test("retry-exhausted mandate can use voluntary recovery checkout", () => {
   assert.equal(getNextActionInteraction(exhausted), "recovery_checkout")
   assert.equal(getRecoveryDemoHref(exhausted), null)
   assert.equal(formatRecoveryStatus(exhausted), "Not recovered — retry limit reached")
+})
+
+test("active links stay actionable through resume and status check while stale links can retry", () => {
+  const active = decision({
+    recommended_action: "RESUME_PAYMENT",
+    button_label: "Resume Recovery Payment",
+    action_type: "RESUME_RECOVERY_CHECKOUT",
+    secondary_action_type: "CHECK_PAYMENT_STATUS",
+    secondary_button_label: "Check Payment Status",
+    existing_link_status: "checkout_opened",
+    link_age_minutes: 12,
+  })
+  assert.equal(getNextActionInteraction(active), "recovery_checkout")
+  assert.equal(active.secondary_action_type, "CHECK_PAYMENT_STATUS")
+  assert.equal(getRecoveryDemoHref(active), null)
+
+  const stale = decision({
+    button_label: "Retry Payment",
+    action_type: "OPEN_RECOVERY_CHECKOUT",
+    existing_link_status: "abandoned",
+    link_age_minutes: 31,
+  })
+  assert.equal(getNextActionInteraction(stale), "recovery_checkout")
+  assert.equal(stale.button_label, "Retry Payment")
+})
+
+test("all 65 seeded fixtures render dynamic backend eligibility without an event-ID exception", () => {
+  const fixtures = JSON.parse(readFileSync(
+    new URL("../synthetic-dataset.json", import.meta.url), "utf8",
+  )) as Array<{
+    event_id: string
+    root_cause: string
+    outcome: NextRecoveryActionDecision["outcome"]
+    attempt_number: number
+    max_attempts_allowed: number
+  }>
+  assert.equal(fixtures.length, 65)
+  for (const fixture of fixtures) {
+    const terminal = fixture.outcome === "recovered" || fixture.outcome === "escalated"
+    const alwaysEligible = ["checkout_abandoned", "insufficient_balance", "incorrect_pin", "mandate_expired"]
+      .includes(fixture.root_cause)
+    const exhaustedEligible = ["bank_temp_error", "mandate_failed_retryable"].includes(fixture.root_cause)
+      && fixture.max_attempts_allowed > 0
+      && fixture.attempt_number >= fixture.max_attempts_allowed
+    const allowed = !terminal && (alwaysEligible || exhaustedEligible)
+    const backendDecision = decision({
+      event_id: fixture.event_id,
+      outcome: fixture.outcome,
+      current_outcome: fixture.outcome,
+      attempts_made: fixture.attempt_number,
+      max_attempts: fixture.max_attempts_allowed,
+      is_action_allowed: allowed,
+      action_type: allowed ? "OPEN_RECOVERY_CHECKOUT" : "NONE",
+    })
+    assert.equal(getNextActionInteraction(backendDecision), allowed ? "recovery_checkout" : "disabled",
+      fixture.event_id)
+  }
 })
 
 test("cancelled and recovered decisions remain disabled while PIN allows voluntary retry", () => {

@@ -2,6 +2,7 @@ package com.revenueRecovery.service;
 
 import com.revenueRecovery.controller.dto.BatchSummaryResponse;
 import com.revenueRecovery.controller.dto.RazorpayPaymentVerificationRequest;
+import com.revenueRecovery.model.enums.LifecycleState;
 import com.revenueRecovery.model.AuditRecord;
 import com.revenueRecovery.model.Event;
 import com.revenueRecovery.model.RazorpayTestCheckoutAttempt;
@@ -50,6 +51,7 @@ class TransactionRecoveryFinalizationServiceTest {
     @Autowired RazorpayTestCheckoutAttemptRepository attemptRepository;
     @Autowired TransactionRecoveryPaymentLinkRepository linkRepository;
     @Autowired RazorpaySignatureVerificationService verificationService;
+    @Autowired TransactionRecoveryStatusService statusService;
 
     @BeforeEach
     void seed() throws Exception {
@@ -66,7 +68,10 @@ class TransactionRecoveryFinalizationServiceTest {
         AuditRecord beforeRecord = auditRepository.findByEventId(EVENT_ID).orElseThrow();
         assertEquals(Outcome.NOT_RECOVERED, beforeRecord.getOutcome());
         BigDecimal amount = beforeRecord.getAmount();
-        BigDecimal recoveredBefore = summaryService.summarize().totalRecovered();
+        BatchSummaryResponse summaryBefore = summaryService.summarize();
+        BigDecimal recoveredBefore = summaryBefore.totalRecovered();
+        var causeBefore = summaryBefore.byCause().stream()
+                .filter(row -> row.rootCause() == beforeRecord.getRootCause()).findFirst().orElseThrow();
         long historyBefore = historyRepository.countByEventId(EVENT_ID);
         RazorpayTestOrder order = createLinkedOrder(beforeRecord);
 
@@ -76,9 +81,13 @@ class TransactionRecoveryFinalizationServiceTest {
         AuditRecord recovered = auditRepository.findByEventId(EVENT_ID).orElseThrow();
         assertEquals(EVENT_ID, result.eventId());
         assertEquals(Outcome.RECOVERED, recovered.getOutcome());
+        assertEquals(LifecycleState.RECOVERED_BY_VERIFIED_TEST_PAYMENT, recovered.getLifecycleState());
         assertEquals(0, recovered.getRecoveredAmount().compareTo(amount));
-        assertEquals(0, summaryService.summarize().totalRecovered()
-                .compareTo(recoveredBefore.add(amount)));
+        BatchSummaryResponse summaryAfter = summaryService.summarize();
+        assertEquals(0, summaryAfter.totalRecovered().compareTo(recoveredBefore.add(amount)));
+        var causeAfter = summaryAfter.byCause().stream()
+                .filter(row -> row.rootCause() == beforeRecord.getRootCause()).findFirst().orElseThrow();
+        assertEquals(0, causeAfter.recoveredAmount().compareTo(causeBefore.recoveredAmount().add(amount)));
         assertEquals(historyBefore + 1, historyRepository.countByEventId(EVENT_ID));
         assertEquals(RecoveryPaymentFinalizationService.LINK_RECOVERED,
                 linkRepository.findByEventEventId(EVENT_ID).orElseThrow().getStatus());
@@ -130,6 +139,38 @@ class TransactionRecoveryFinalizationServiceTest {
                 .count());
     }
 
+    @Test
+    void manualStatusCheckReturnsClearNoPaymentResultAndCanFinalizeStoredSuccess() {
+        AuditRecord record = auditRepository.findByEventId(EVENT_ID).orElseThrow();
+        createLinkedOrder(record);
+
+        var empty = statusService.check(EVENT_ID);
+        assertEquals("no_payment_recorded", empty.status());
+        assertEquals(false, empty.recovered());
+
+        String paymentId = "pay_manual_status_fixture";
+        String signature = verificationService.calculateSignature(ORDER_ID, paymentId,
+                "deterministic_noncredential_fixture_secret");
+        RazorpayTestCheckoutAttempt attempt = new RazorpayTestCheckoutAttempt();
+        attempt.setInternalRequestId(REQUEST_ID);
+        attempt.setRazorpayOrderId(ORDER_ID);
+        attempt.setRazorpayPaymentId(paymentId);
+        attempt.setRazorpaySignature(signature);
+        attempt.setEventType(RazorpayCheckoutEventService.SUCCESS);
+        attempt.setStatus(RazorpayCheckoutEventService.UNVERIFIED);
+        attempt.setCreatedAt(Instant.now());
+        attemptRepository.saveAndFlush(attempt);
+
+        var recovered = statusService.check(EVENT_ID);
+        assertEquals("recovered", recovered.status());
+        assertTrue(recovered.recovered());
+        assertEquals(Outcome.RECOVERED, auditRepository.findByEventId(EVENT_ID).orElseThrow().getOutcome());
+        assertEquals(1, historyRepository.findByEventIdOrderByIdAsc(EVENT_ID).stream()
+                .filter(entry -> entry.getReason() != null
+                        && entry.getReason().startsWith("CUSTOMER_INITIATED_RECOVERY_VERIFIED_TEST_MODE"))
+                .count());
+    }
+
     private RazorpayTestOrder createLinkedOrder(AuditRecord record) {
         Event event = eventRepository.findByEventId(EVENT_ID).orElseThrow();
         long paise = RazorpayAmountConverter.toPaise(record.getAmount());
@@ -142,7 +183,7 @@ class TransactionRecoveryFinalizationServiceTest {
         order.setCurrency("INR");
         order.setStatus(RazorpayCheckoutEventService.UNVERIFIED);
         order.setMode("test");
-        order.setCreatedAt(Instant.parse("2026-09-01T09:59:00Z"));
+        order.setCreatedAt(Instant.now());
         orderRepository.saveAndFlush(order);
 
         TransactionRecoveryPaymentLink link = new TransactionRecoveryPaymentLink();
@@ -156,7 +197,7 @@ class TransactionRecoveryFinalizationServiceTest {
         link.setPurpose(TransactionRecoveryCheckoutService.PURPOSE);
         link.setRecoveryAction(RecoveryCheckoutAction.RESUME_PAYMENT);
         link.setStatus(RazorpayCheckoutEventService.UNVERIFIED);
-        link.setCreatedAt(Instant.parse("2026-09-01T09:59:00Z"));
+        link.setCreatedAt(Instant.now());
         linkRepository.saveAndFlush(link);
         assertTrue(linkRepository.existsByEventEventId(EVENT_ID));
         return order;

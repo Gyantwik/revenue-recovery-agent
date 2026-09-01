@@ -26,7 +26,7 @@ public class TransactionRecoveryAuditService {
         history.setEventId(record.getEventId());
         history.setTimestamp(timestamp);
         history.setPreviousState(previousState);
-        history.setNewState(LifecycleState.RECOVERED);
+        history.setNewState(LifecycleState.RECOVERED_BY_VERIFIED_TEST_PAYMENT);
         history.setRootCause(record.getRootCause());
         history.setClassificationConfidence(record.getClassificationConfidence());
         history.setPolicyRuleMatched(record.getPolicyRuleMatched());
@@ -34,7 +34,8 @@ public class TransactionRecoveryAuditService {
         history.setAttemptNumber(record.getAttemptNumber());
         history.setMaxAttemptsAllowed(record.getMaxAttemptsAllowed());
         history.setOutcomeIfTerminal(Outcome.RECOVERED);
-        history.setReason("Customer-initiated Test Mode recovery Checkout was verified by the backend; "
+        history.setReason("CUSTOMER_INITIATED_RECOVERY_VERIFIED_TEST_MODE; "
+                + "Customer-initiated Test Mode recovery Checkout was verified by the backend; "
                 + "action=" + link.getRecoveryAction() + "; order_id=" + link.getRazorpayOrderId()
                 + "; payment_id=" + paymentId);
         history.setActor(AuditActor.RAZORPAY_TEST_VERIFICATION);
