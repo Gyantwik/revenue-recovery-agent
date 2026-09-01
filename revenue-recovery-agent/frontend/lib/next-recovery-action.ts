@@ -1,10 +1,12 @@
 import type { NextRecoveryActionDecision } from "./types.ts"
 
-export type NextActionInteraction = "disabled" | "information" | "test_mode_checkout"
+export type NextActionInteraction = "disabled" | "information" | "recovery_checkout" | "test_mode_checkout"
 
 export function getNextActionInteraction(decision: NextRecoveryActionDecision): NextActionInteraction {
   if (!decision.is_action_allowed || decision.action_type === "NONE") return "disabled"
   if (decision.action_type === "DISPLAY_INFORMATION") return "information"
+  if (decision.action_type === "OPEN_RECOVERY_CHECKOUT"
+    && decision.mode === "razorpay_test_recovery") return "recovery_checkout"
   if (decision.action_type === "OPEN_TEST_MODE_RECOVERY_CHECKOUT"
     && decision.mode === "razorpay_test_demo") return "test_mode_checkout"
   return "disabled"

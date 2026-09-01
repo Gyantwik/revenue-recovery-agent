@@ -7,6 +7,7 @@ import com.revenueRecovery.model.RazorpayTestOrder;
 import com.revenueRecovery.repository.RazorpayTestCheckoutAttemptRepository;
 import com.revenueRecovery.repository.RazorpayTestOrderRepository;
 import com.revenueRecovery.repository.RecoveryPaymentLinkRepository;
+import com.revenueRecovery.repository.TransactionRecoveryPaymentLinkRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +25,16 @@ public class RazorpayCheckoutEventService {
     private final RazorpayTestOrderRepository orderRepository;
     private final RazorpayTestCheckoutAttemptRepository attemptRepository;
     private final RecoveryPaymentLinkRepository recoveryLinkRepository;
+    private final TransactionRecoveryPaymentLinkRepository transactionLinkRepository;
 
     public RazorpayCheckoutEventService(RazorpayTestOrderRepository orderRepository,
             RazorpayTestCheckoutAttemptRepository attemptRepository,
-            RecoveryPaymentLinkRepository recoveryLinkRepository) {
+            RecoveryPaymentLinkRepository recoveryLinkRepository,
+            TransactionRecoveryPaymentLinkRepository transactionLinkRepository) {
         this.orderRepository = orderRepository;
         this.attemptRepository = attemptRepository;
         this.recoveryLinkRepository = recoveryLinkRepository;
+        this.transactionLinkRepository = transactionLinkRepository;
     }
 
     @Transactional
@@ -76,6 +80,10 @@ public class RazorpayCheckoutEventService {
         recoveryLinkRepository.findByInternalRequestId(request.internalRequestId()).ifPresent(link -> {
             link.setStatus(UNVERIFIED);
             recoveryLinkRepository.save(link);
+        });
+        transactionLinkRepository.findByInternalRequestId(request.internalRequestId()).ifPresent(link -> {
+            link.setStatus(UNVERIFIED);
+            transactionLinkRepository.save(link);
         });
         return new RazorpayCheckoutEventResponse(request.internalRequestId(), request.razorpayOrderId(),
                 blankToNull(request.razorpayPaymentId()), request.eventType(), UNVERIFIED, now);

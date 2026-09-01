@@ -312,23 +312,50 @@ Stable `action_type` values:
 | `NONE` | Blocked, completed, or informationally scheduled; the button is disabled. |
 | `DISPLAY_INFORMATION` | Shows/acknowledges guidance in the browser only. No backend mutation occurs. |
 | `OPEN_TEST_MODE_RECOVERY_CHECKOUT` | Navigates only the dedicated demo case to the existing Razorpay Test Mode recovery flow. |
+| `OPEN_RECOVERY_CHECKOUT` | Creates a linked, customer-initiated Test Mode recovery Checkout after the backend rechecks transaction eligibility. |
 
-Stable `recommended_action` values are `ALREADY_RECOVERED`, `STOPPED_BY_POLICY`, `ESCALATE_TO_MERCHANT`, `ESCALATE_MANDATE_RENEWAL`, `VERIFY_PAYMENT_STATUS`, `AWAIT_SCHEDULED_RETRY`, `AWAIT_SCHEDULED_MANDATE_RETRY`, `ESCALATE_AFTER_RETRY_EXHAUSTED`, `SEND_RECOVERY_LINK`, and `SEND_ALT_PAYMENT_LINK`. Modes are `synthetic_benchmark` and `razorpay_test_demo`.
+Stable `recommended_action` values include `ALREADY_RECOVERED`, `STOPPED_BY_POLICY`, `ESCALATE_TO_MERCHANT`, `ESCALATE_MANDATE_RENEWAL`, `VERIFY_PAYMENT_STATUS`, `AWAIT_SCHEDULED_RETRY`, `AWAIT_SCHEDULED_MANDATE_RETRY`, `ESCALATE_AFTER_RETRY_EXHAUSTED`, `SEND_RECOVERY_LINK`, `SEND_ALT_PAYMENT_LINK`, and `CUSTOMER_RECOVERY_CHECKOUT`. Modes are `synthetic_benchmark`, `razorpay_test_demo`, and `razorpay_test_recovery`.
 
 Policy behavior:
 
 - recovered cases return `ALREADY_RECOVERED`;
-- cancelled and PIN/authentication-failure cases return `STOPPED_BY_POLICY`;
+- cancelled cases return `STOPPED_BY_POLICY`; PIN/authentication failure blocks automatic retry but can offer a voluntary customer recovery Checkout;
 - unknown and gateway cases return merchant-review guidance;
-- expired/revoked mandates return mandate-review guidance;
+- expired/revoked mandates that are already escalated return mandate-review guidance;
 - pending payments return status-verification guidance to avoid duplicate debit;
 - bank/network/mandate retries with attempts remaining stay scheduled and cannot be manually forced;
-- exhausted retries return review/escalation guidance and prohibit another automatic debit;
-- ordinary checkout-abandoned and insufficient-balance benchmark rows expose policy guidance only and cannot open Checkout;
+- exhausted bank-temporary-error and mandate-retry cases prohibit another automatic debit but can offer a voluntary one-time recovery Checkout;
+- eligible checkout-abandoned and insufficient-balance benchmark rows can open a voluntary recovery Checkout;
 - only the separate, eligible `TXN_DEMO_RECOVERY_001` returns `OPEN_TEST_MODE_RECOVERY_CHECKOUT`;
 - after verified demo recovery, the same event returns `ALREADY_RECOVERED`.
 
-Recommended actions, scheduled actions, escalation guidance, and blocked actions are not payment success. **Recover Amount** and **Mark Recovered** are intentionally absent. Only the dedicated demo's verified Razorpay Test Mode callback can atomically change its separate recovery status. The original 65-case benchmark remains static and excluded from the demo; no real money moves.
+Recommended actions, scheduled actions, escalation guidance, and blocked actions are not payment success. **Recover Amount** and **Mark Recovered** are intentionally absent. A linked benchmark transaction changes only after its Razorpay Test Mode callback passes server-side HMAC verification; the dedicated demo continues to use its separate recovery state. No real money moves.
+
+## POST `/api/transactions/{eventId}/recovery-checkout`
+
+Creates at most one policy-approved Razorpay Test Mode order explicitly linked to a normal persisted event. The request has no body: amount and currency are always derived from the locked event and audit record, converted from `BigDecimal` INR to integer paise, and cross-checked server-side.
+
+```json
+{
+  "event_id": "TXN10043",
+  "internal_request_id": "req_...",
+  "razorpay_order_id": "order_...",
+  "amount": 315000,
+  "currency": "INR",
+  "receipt": "recoverai_...",
+  "recovery_action": "RESUME_PAYMENT",
+  "recovery_status": "awaiting_customer_payment",
+  "mode": "test"
+}
+```
+
+Eligible unrecovered categories are checkout abandoned (**Resume Payment**), insufficient balance (**Choose Another Payment Method**), incorrect PIN/auth failure (**Try Payment Again Securely**, while automatic retry stays blocked), bank temporary error after automatic retries are exhausted (**Try Payment Again**), and retryable mandate failure after mandate retries are exhausted (**Pay Manually**). Mandate-expired/revoked cases could only use a voluntary manual-payment policy with appropriate consent context; the current dataset records are escalated, so the escalated-state guard blocks Checkout.
+
+Payment pending is blocked until the original payment status is verified. Weak network/client timeout is blocked until the previous attempt is confirmed failed. User cancellation, merchant/gateway issues, unknown/manual review, recovered records, escalated records, retries that are still scheduled, and records with an active or verified link are also blocked. Policy rejection returns a safe `409`; an unknown event returns `404`.
+
+The link is persisted independently from the dedicated demo link, with unique event, internal-request, order, and payment identifiers. Checkout intake changes only the link to `client_reported_unverified`. A valid call to `POST /api/razorpay/test/verify-payment` then locks the order, attempt, link, event, and audit record and atomically sets the transaction outcome to `recovered`, sets recovered amount from persisted money, appends exactly one audit-history entry, and sets the link to `recovered_by_verified_test_payment`. A failure rolls the transaction back; invalid or repeated verification cannot double-count revenue or append a second successful audit entry.
+
+An **automatic retry** is a policy-scheduled system attempt. A **customer-initiated retry** is a voluntary hosted-Checkout attempt after an eligible failure. A **recovery Checkout** is the linked Razorpay Test Mode order and browser flow. A **verified recovery** exists only after backend HMAC verification and is the only stage that updates transaction and dashboard recovery metrics. No Live Mode, real charge, capture, settlement, payout, or refund is performed.
 
 ## Synthetic action endpoints
 

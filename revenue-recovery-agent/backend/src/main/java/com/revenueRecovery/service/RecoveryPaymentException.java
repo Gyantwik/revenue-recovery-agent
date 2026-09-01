@@ -22,6 +22,11 @@ public class RecoveryPaymentException extends RuntimeException {
                 "Recovery payment not allowed", "Recovery payment is not allowed for this policy outcome.");
     }
 
+    public static RecoveryPaymentException notAllowed(String message) {
+        return new RecoveryPaymentException(HttpStatus.CONFLICT,
+                "Recovery payment not allowed", message);
+    }
+
     public static RecoveryPaymentException alreadyRecovered() {
         return new RecoveryPaymentException(HttpStatus.CONFLICT,
                 "Recovery case already completed", "This case is already recovered.");

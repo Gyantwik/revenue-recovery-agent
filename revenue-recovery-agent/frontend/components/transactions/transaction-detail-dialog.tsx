@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -13,8 +14,17 @@ import { Button } from "@/components/ui/button"
 import { StatusBadge, CauseBadge } from "@/components/status-badge"
 import type { NextRecoveryActionDecision, Transaction } from "@/lib/types"
 import { ACTION_LABELS, CASE_TYPE_LABELS } from "@/lib/labels"
-import { getNextRecoveryAction } from "@/lib/api"
+import {
+  createTransactionRecoveryCheckout,
+  getNextRecoveryAction,
+  getRazorpayTestConfig,
+  getTransaction,
+  recordRazorpayCheckoutEvent,
+  verifyRazorpayTestPayment,
+} from "@/lib/api"
 import { formatRecoveryStatus, getNextActionInteraction, getRecoveryDemoHref } from "@/lib/next-recovery-action"
+import { createSingleFlightRunner, loadRazorpayCheckoutScript } from "@/lib/razorpay-checkout"
+import { startTransactionRecoveryFlow, type TransactionRecoveryFlowState } from "@/lib/transaction-recovery"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
 import {
   ExternalLink,
@@ -28,17 +38,23 @@ interface TransactionDetailDialogProps {
   transaction: Transaction | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onTransactionUpdated: (transaction: Transaction) => void
 }
 
 export function TransactionDetailDialog({
   transaction,
   open,
   onOpenChange,
+  onTransactionUpdated,
 }: TransactionDetailDialogProps) {
+  const router = useRouter()
+  const runRecovery = useRef(createSingleFlightRunner())
   const [decision, setDecision] = useState<NextRecoveryActionDecision | null>(null)
   const [decisionError, setDecisionError] = useState<string | null>(null)
   const [decisionLoading, setDecisionLoading] = useState(false)
   const [informationAcknowledged, setInformationAcknowledged] = useState(false)
+  const [recoveryState, setRecoveryState] = useState<TransactionRecoveryFlowState | null>(null)
+  const [recoveryRunning, setRecoveryRunning] = useState(false)
 
   useEffect(() => {
     if (!open || !transaction) return
@@ -46,6 +62,7 @@ export function TransactionDetailDialog({
     setDecision(null)
     setDecisionError(null)
     setInformationAcknowledged(false)
+    setRecoveryState(null)
     setDecisionLoading(true)
     void getNextRecoveryAction(transaction.event_id)
       .then(result => { if (active) setDecision(result) })
@@ -55,6 +72,45 @@ export function TransactionDetailDialog({
       .finally(() => { if (active) setDecisionLoading(false) })
     return () => { active = false }
   }, [open, transaction])
+
+  const handleRecoveryCheckout = async () => {
+    if (!transaction || !decision) return
+    setRecoveryRunning(true)
+    setRecoveryState(null)
+    try {
+      const started = await runRecovery.current(async () => startTransactionRecoveryFlow(
+        transaction.event_id,
+        {
+          createOrder: createTransactionRecoveryCheckout,
+          getConfig: getRazorpayTestConfig,
+          recordEvent: recordRazorpayCheckoutEvent,
+          verifyPayment: verifyRazorpayTestPayment,
+          getTransaction,
+          loadScript: loadRazorpayCheckoutScript,
+          createCheckout: options => {
+            if (!window.Razorpay) throw new Error("Razorpay Checkout is unavailable")
+            return new window.Razorpay(options)
+          },
+          onState: setRecoveryState,
+          onRecovered: recovered => {
+            onTransactionUpdated(recovered)
+            void getNextRecoveryAction(recovered.event_id).then(setDecision)
+            router.refresh()
+          },
+        },
+      ))
+      if (!started) {
+        setRecoveryState({ message: "A recovery Checkout is already being opened.", status: "error" })
+      }
+    } catch (error) {
+      setRecoveryState({
+        message: error instanceof Error ? error.message : "Recovery Checkout could not be opened.",
+        status: "error",
+      })
+    } finally {
+      setRecoveryRunning(false)
+    }
+  }
 
   if (!transaction) return null
 
@@ -143,7 +199,21 @@ export function TransactionDetailDialog({
                   decision={decision}
                   acknowledged={informationAcknowledged}
                   onAcknowledge={() => setInformationAcknowledged(true)}
+                  recoveryRunning={recoveryRunning}
+                  onRecoveryCheckout={() => { void handleRecoveryCheckout() }}
                 />
+                {decision.action_type === "OPEN_RECOVERY_CHECKOUT" && (
+                  <p className="text-xs text-muted-foreground">
+                    Razorpay Test Mode — no real money is charged. The customer must voluntarily complete Checkout.
+                  </p>
+                )}
+                {recoveryState && (
+                  <p role="status" className={recoveryState.status === "error" || recoveryState.status === "verification_failed"
+                    ? "text-xs text-red-700 dark:text-red-300"
+                    : "text-xs text-teal-800 dark:text-teal-200"}>
+                    {recoveryState.message}
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -257,13 +327,27 @@ function DecisionButton({
   decision,
   acknowledged,
   onAcknowledge,
+  recoveryRunning,
+  onRecoveryCheckout,
 }: {
   decision: NextRecoveryActionDecision
   acknowledged: boolean
   onAcknowledge: () => void
+  recoveryRunning: boolean
+  onRecoveryCheckout: () => void
 }) {
   const interaction = getNextActionInteraction(decision)
   const demoHref = getRecoveryDemoHref(decision)
+
+  if (interaction === "recovery_checkout") {
+    return (
+      <Button type="button" size="sm" className="gap-1.5 text-xs"
+        disabled={recoveryRunning} onClick={onRecoveryCheckout}>
+        {recoveryRunning && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        {decision.button_label}
+      </Button>
+    )
+  }
 
   if (interaction === "test_mode_checkout" && demoHref) {
     return (

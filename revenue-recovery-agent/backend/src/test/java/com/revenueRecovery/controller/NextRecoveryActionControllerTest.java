@@ -43,22 +43,24 @@ class NextRecoveryActionControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Transaction not found"));
 
-        assertDecision("TXN10001", "STOPPED_BY_POLICY", "NONE", false);
-        assertDecision("TXN10006", "STOPPED_BY_POLICY", "NONE", false);
-        assertDecision("TXN10010", "ESCALATE_TO_MERCHANT", "DISPLAY_INFORMATION", true);
-        assertDecision("TXN10029", "VERIFY_PAYMENT_STATUS", "DISPLAY_INFORMATION", true);
-        assertDecision("TXN10048", "ESCALATE_TO_MERCHANT", "DISPLAY_INFORMATION", true);
-        assertDecision("TXN10051", "ESCALATE_MANDATE_RENEWAL", "DISPLAY_INFORMATION", true);
-        assertDecision("TXN10021", "ESCALATE_AFTER_RETRY_EXHAUSTED", "DISPLAY_INFORMATION", true);
-        assertDecision("TXN10059", "ESCALATE_AFTER_RETRY_EXHAUSTED", "DISPLAY_INFORMATION", true);
+        assertDecision("TXN10001", "STOPPED_BY_POLICY", "NONE", false, "synthetic_benchmark");
+        assertDecision("TXN10006", "CUSTOMER_RECOVERY_CHECKOUT", "OPEN_RECOVERY_CHECKOUT", true,
+                "razorpay_test_recovery");
+        assertDecision("TXN10010", "ESCALATE_TO_MERCHANT", "NONE", false, "synthetic_benchmark");
+        assertDecision("TXN10029", "VERIFY_PAYMENT_STATUS", "NONE", false, "synthetic_benchmark");
+        assertDecision("TXN10048", "ESCALATE_TO_MERCHANT", "NONE", false, "synthetic_benchmark");
+        assertDecision("TXN10051", "ESCALATE_MANDATE_RENEWAL", "NONE", false, "synthetic_benchmark");
+        assertDecision("TXN10021", "VERIFY_PAYMENT_STATUS", "NONE", false, "synthetic_benchmark");
+        assertDecision("TXN10059", "CUSTOMER_RECOVERY_CHECKOUT", "OPEN_RECOVERY_CHECKOUT", true,
+                "razorpay_test_recovery");
         // The deterministic baseline recovered every seeded checkout-abandoned and
         // insufficient-balance row, so the terminal guard correctly takes priority.
-        assertDecision("TXN10045", "ALREADY_RECOVERED", "NONE", false);
-        assertDecision("TXN10037", "ALREADY_RECOVERED", "NONE", false);
+        assertDecision("TXN10045", "ALREADY_RECOVERED", "NONE", false, "synthetic_benchmark");
+        assertDecision("TXN10037", "ALREADY_RECOVERED", "NONE", false, "synthetic_benchmark");
     }
 
     @Test
-    void dedicatedDemoIsTheOnlyCheckoutCapableDecision() throws Exception {
+    void dedicatedDemoRetainsItsSeparateCheckoutDecision() throws Exception {
         mockMvc.perform(get("/api/transactions/TXN_DEMO_RECOVERY_001/next-action"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.current_outcome").value("not_recovered"))
@@ -107,7 +109,8 @@ class NextRecoveryActionControllerTest {
                 .andExpect(jsonPath("$.total_cases").value(65));
     }
 
-    private void assertDecision(String eventId, String recommendation, String actionType, boolean allowed)
+    private void assertDecision(String eventId, String recommendation, String actionType, boolean allowed,
+            String mode)
             throws Exception {
         mockMvc.perform(get("/api/transactions/{eventId}/next-action", eventId))
                 .andExpect(status().isOk())
@@ -115,6 +118,6 @@ class NextRecoveryActionControllerTest {
                 .andExpect(jsonPath("$.recommended_action").value(recommendation))
                 .andExpect(jsonPath("$.action_type").value(actionType))
                 .andExpect(jsonPath("$.is_action_allowed").value(allowed))
-                .andExpect(jsonPath("$.mode").value("synthetic_benchmark"));
+                .andExpect(jsonPath("$.mode").value(mode));
     }
 }

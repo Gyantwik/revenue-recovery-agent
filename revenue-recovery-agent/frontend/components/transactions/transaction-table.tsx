@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useEffect, useState, useMemo } from "react"
 import {
   Table,
   TableBody,
@@ -33,15 +33,18 @@ export function TransactionTable({
   const [selectedCaseType, setSelectedCaseType] = useState<string>("all")
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [transactions, setTransactions] = useState(initialTransactions)
+
+  useEffect(() => setTransactions(initialTransactions), [initialTransactions])
 
   const filteredTransactions = useMemo(() => {
-    return filterTransactions(initialTransactions, {
+    return filterTransactions(transactions, {
       searchTerm,
       caseType: selectedCaseType,
       rootCause: selectedCause,
       outcome: selectedOutcome,
     })
-  }, [initialTransactions, searchTerm, selectedCause, selectedOutcome, selectedCaseType])
+  }, [transactions, searchTerm, selectedCause, selectedOutcome, selectedCaseType])
 
   const resetFilters = () => {
     setSearchTerm("")
@@ -53,6 +56,12 @@ export function TransactionTable({
   const handleRowClick = (txn: Transaction) => {
     setSelectedTxn(txn)
     setDialogOpen(true)
+  }
+
+  const handleTransactionUpdated = (updated: Transaction) => {
+    setTransactions(current => current.map(transaction =>
+      transaction.event_id === updated.event_id ? updated : transaction))
+    setSelectedTxn(updated)
   }
 
   const causesList: { value: string; label: string }[] = [
@@ -232,7 +241,7 @@ export function TransactionTable({
 
         <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            Showing <strong>{filteredTransactions.length}</strong> of <strong>{initialTransactions.length}</strong> failure events
+            Showing <strong>{filteredTransactions.length}</strong> of <strong>{transactions.length}</strong> failure events
           </span>
           <span className="hidden sm:inline">
             Click any row to inspect signals used, policy match rules, and live triggers.
@@ -244,6 +253,7 @@ export function TransactionTable({
         transaction={selectedTxn}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        onTransactionUpdated={handleTransactionUpdated}
       />
     </div>
   )

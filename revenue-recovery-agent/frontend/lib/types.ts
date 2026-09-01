@@ -64,11 +64,12 @@ export type NextRecoveryAction =
   | "AWAIT_SCHEDULED_RETRY"
   | "AWAIT_SCHEDULED_MANDATE_RETRY"
   | "ESCALATE_AFTER_RETRY_EXHAUSTED"
+  | "CUSTOMER_RECOVERY_CHECKOUT"
   | "SEND_RECOVERY_LINK"
   | "SEND_ALT_PAYMENT_LINK"
 
-export type NextActionType = "NONE" | "DISPLAY_INFORMATION" | "OPEN_TEST_MODE_RECOVERY_CHECKOUT"
-export type NextActionMode = "synthetic_benchmark" | "razorpay_test_demo"
+export type NextActionType = "NONE" | "DISPLAY_INFORMATION" | "OPEN_RECOVERY_CHECKOUT" | "OPEN_TEST_MODE_RECOVERY_CHECKOUT"
+export type NextActionMode = "synthetic_benchmark" | "razorpay_test_recovery" | "razorpay_test_demo"
 
 export interface NextRecoveryActionDecision {
   event_id: string
@@ -184,6 +185,25 @@ export interface RecoveryLinkedOrder {
   currency: "INR"
   receipt: string
   link_status: "order_created"
+  recovery_status: "awaiting_customer_payment"
+  mode: "test"
+}
+
+export type RecoveryCheckoutAction =
+  | "RESUME_PAYMENT"
+  | "CHOOSE_ANOTHER_PAYMENT_METHOD"
+  | "TRY_PAYMENT_AGAIN_SECURELY"
+  | "TRY_PAYMENT_AGAIN"
+  | "PAY_MANUALLY"
+
+export interface TransactionRecoveryOrder {
+  event_id: string
+  internal_request_id: string
+  razorpay_order_id: string
+  amount: number
+  currency: "INR"
+  receipt: string
+  recovery_action: RecoveryCheckoutAction
   recovery_status: "awaiting_customer_payment"
   mode: "test"
 }

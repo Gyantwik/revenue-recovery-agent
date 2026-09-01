@@ -11,6 +11,7 @@ import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RootCause;
 import com.revenueRecovery.repository.AuditRecordRepository;
 import com.revenueRecovery.repository.RecoveryDemoCaseRepository;
+import com.revenueRecovery.repository.TransactionRecoveryPaymentLinkRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,12 +31,14 @@ import static org.mockito.Mockito.when;
 class TransactionNextActionServiceTest {
     @Mock AuditRecordRepository auditRecordRepository;
     @Mock RecoveryDemoCaseRepository demoCaseRepository;
+    @Mock TransactionRecoveryPaymentLinkRepository transactionLinkRepository;
 
     private TransactionNextActionService service;
 
     @BeforeEach
     void setUp() {
-        service = new TransactionNextActionService(auditRecordRepository, demoCaseRepository);
+        service = new TransactionNextActionService(auditRecordRepository, demoCaseRepository,
+                new RecoveryTransactionEligibilityService(transactionLinkRepository));
     }
 
     @Test
@@ -53,24 +56,25 @@ class TransactionNextActionServiceTest {
     }
 
     @Test
-    void cancellationAndAuthenticationFailureAreHardStops() {
+    void cancellationIsBlockedButAuthenticationFailureAllowsVoluntaryCheckout() {
         assertDecision(decide(record("cancelled", RootCause.USER_CANCELLED, Outcome.STOPPED_CORRECTLY,
                 LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.STOPPED_BY_POLICY, NextActionType.NONE, false);
         assertDecision(decide(record("pin", RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY,
-                LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.STOPPED_BY_POLICY, NextActionType.NONE, false);
+                LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.CUSTOMER_RECOVERY_CHECKOUT,
+                NextActionType.OPEN_RECOVERY_CHECKOUT, true);
     }
 
     @Test
     void uncertainGatewayAndExpiredMandateCasesOfferGuidanceOnly() {
         assertDecision(decide(record("unknown", RootCause.UNKNOWN, Outcome.ESCALATED,
                 LifecycleState.ESCALATED, 0, 0)), NextRecoveryAction.ESCALATE_TO_MERCHANT,
-                NextActionType.DISPLAY_INFORMATION, true);
+                NextActionType.NONE, false);
         assertDecision(decide(record("gateway", RootCause.MERCHANT_GATEWAY_ISSUE, Outcome.ESCALATED,
                 LifecycleState.ESCALATED, 0, 0)), NextRecoveryAction.ESCALATE_TO_MERCHANT,
-                NextActionType.DISPLAY_INFORMATION, true);
+                NextActionType.NONE, false);
         assertDecision(decide(record("mandate-expired", RootCause.MANDATE_EXPIRED, Outcome.ESCALATED,
                 LifecycleState.ESCALATED, 0, 0)), NextRecoveryAction.ESCALATE_MANDATE_RENEWAL,
-                NextActionType.DISPLAY_INFORMATION, true);
+                NextActionType.NONE, false);
     }
 
     @Test
@@ -78,14 +82,14 @@ class TransactionNextActionServiceTest {
         NextRecoveryActionResponse result = decide(record("pending", RootCause.PAYMENT_PENDING,
                 Outcome.ESCALATED, LifecycleState.ESCALATED, 1, 1));
         assertDecision(result, NextRecoveryAction.VERIFY_PAYMENT_STATUS,
-                NextActionType.DISPLAY_INFORMATION, true);
+                NextActionType.NONE, false);
     }
 
     @Test
     void boundedRetriesAreInformationalUntilExhausted() {
         NextRecoveryActionResponse weakScheduled = decide(record("weak-scheduled", RootCause.WEAK_NETWORK,
                 Outcome.NOT_RECOVERED, LifecycleState.RETRY_SCHEDULED, 1, 2));
-        assertDecision(weakScheduled, NextRecoveryAction.AWAIT_SCHEDULED_RETRY, NextActionType.NONE, false);
+        assertDecision(weakScheduled, NextRecoveryAction.VERIFY_PAYMENT_STATUS, NextActionType.NONE, false);
 
         NextRecoveryActionResponse bankScheduled = decide(record("bank-scheduled", RootCause.BANK_TEMP_ERROR,
                 Outcome.NOT_RECOVERED, LifecycleState.RETRY_SCHEDULED, 1, 2));
@@ -99,25 +103,27 @@ class TransactionNextActionServiceTest {
     }
 
     @Test
-    void exhaustedRetriesAllowOnlyReviewOrEscalationGuidance() {
-        for (RootCause cause : new RootCause[] {
-                RootCause.WEAK_NETWORK, RootCause.BANK_TEMP_ERROR, RootCause.MANDATE_FAILED_RETRYABLE }) {
+    void exhaustedBankAndMandateRetriesAllowVoluntaryCheckoutButWeakNetworkDoesNot() {
+        NextRecoveryActionResponse weak = decide(record("weak", RootCause.WEAK_NETWORK,
+                Outcome.NOT_RECOVERED, LifecycleState.RETRY_EXHAUSTED, 2, 2));
+        assertDecision(weak, NextRecoveryAction.VERIFY_PAYMENT_STATUS, NextActionType.NONE, false);
+        for (RootCause cause : new RootCause[] { RootCause.BANK_TEMP_ERROR,
+                RootCause.MANDATE_FAILED_RETRYABLE }) {
             NextRecoveryActionResponse result = decide(record("exhausted-" + cause.name(), cause,
                     Outcome.NOT_RECOVERED, LifecycleState.RETRY_EXHAUSTED, 2, 2));
-            assertDecision(result, NextRecoveryAction.ESCALATE_AFTER_RETRY_EXHAUSTED,
-                    NextActionType.DISPLAY_INFORMATION, true);
-            assertTrue(result.riskNote().toLowerCase().contains("do not"));
+            assertDecision(result, NextRecoveryAction.CUSTOMER_RECOVERY_CHECKOUT,
+                    NextActionType.OPEN_RECOVERY_CHECKOUT, true);
         }
     }
 
     @Test
-    void regularBenchmarkPaymentLinkPoliciesAreReadOnlyGuidance() {
+    void safeBenchmarkCasesOfferCustomerInitiatedCheckout() {
         assertDecision(decide(record("checkout", RootCause.CHECKOUT_ABANDONED, Outcome.NOT_RECOVERED,
-                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.SEND_RECOVERY_LINK,
-                NextActionType.NONE, false);
+                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.CUSTOMER_RECOVERY_CHECKOUT,
+                NextActionType.OPEN_RECOVERY_CHECKOUT, true);
         assertDecision(decide(record("balance", RootCause.INSUFFICIENT_BALANCE, Outcome.NOT_RECOVERED,
-                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.SEND_ALT_PAYMENT_LINK,
-                NextActionType.NONE, false);
+                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.CUSTOMER_RECOVERY_CHECKOUT,
+                NextActionType.OPEN_RECOVERY_CHECKOUT, true);
     }
 
     @Test
@@ -174,7 +180,8 @@ class TransactionNextActionServiceTest {
         assertEquals(recommendation, result.recommendedAction());
         assertEquals(type, result.actionType());
         assertEquals(allowed, result.actionAllowed());
-        if (type != NextActionType.OPEN_TEST_MODE_RECOVERY_CHECKOUT) {
+        if (type != NextActionType.OPEN_TEST_MODE_RECOVERY_CHECKOUT
+                && type != NextActionType.OPEN_RECOVERY_CHECKOUT) {
             assertFalse(result.buttonLabel().toLowerCase().contains("recover amount"));
         }
     }
