@@ -73,7 +73,7 @@ function harness(verificationResult: "valid" | "invalid" | "error" = "valid") {
 test("checkout page clearly labels Test Mode and server-side verification boundary", async () => {
   const source = await readFile(new URL("../app/razorpay-test/page.tsx", import.meta.url), "utf8")
   assert.match(source, /Razorpay Test Mode — Checkout Demo/)
-  assert.match(source, /standalone checkout remains isolated/i)
+  assert.match(source, /Failure recovery is available from each eligible transaction’s detail drawer/i)
   assert.doesNotMatch(source.toLowerCase(), /key_secret|razorpay_key_secret/)
   assert.doesNotMatch(source, /razorpay_signature/)
 })
@@ -98,7 +98,7 @@ test("success callback records intake before verification and shows signature ve
   assert.equal(context.events[0]?.razorpay_payment_id, "pay_test")
   assert.ok(context.calls.indexOf("record-event") < context.calls.indexOf("verify-payment"))
   assert.match(context.states.at(-1)?.message ?? "", /signature verified/i)
-  assert.match(context.states.at(-1)?.message ?? "", /does not update a recovery case/i)
+  assert.match(context.states.at(-1)?.message ?? "", /available on the dashboard/i)
   assert.equal(context.states.at(-1)?.status, "verified_test_payment")
 })
 
@@ -139,8 +139,45 @@ test("dismissal records a non-success unverified event", async () => {
     internal_request_id: "req_test",
     razorpay_order_id: "order_test",
     event_type: "checkout_failed_or_dismissed",
-    reason: "user_cancelled_or_test_failure",
+    reason: "payment_cancelled",
+    customer_ref: "test.customer@example.invalid",
+    error_code: undefined,
+    error_description: undefined,
+    error_source: undefined,
+    error_step: undefined,
+    latency_ms: 0,
+    simulated_connection: false,
   })
+})
+
+test("payment.failed forwards the complete Razorpay error diagnostics", async () => {
+  const context = harness()
+  let failureHandler: ((response: { error?: Record<string, string> }) => void) | undefined
+  context.dependencies.createCheckout = received => {
+    return { open() {}, on: (_event, handler) => { failureHandler = handler } }
+  }
+  await startCheckoutFlow(500, context.dependencies)
+  failureHandler?.({ error: { reason: "insufficient_fund", code: "BAD_REQUEST_ERROR",
+    description: "Insufficient funds", source: "bank", step: "payment_authentication" } })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.equal(context.events[0]?.reason, "insufficient_fund")
+  assert.equal(context.events[0]?.error_code, "BAD_REQUEST_ERROR")
+  assert.equal(context.events[0]?.error_step, "payment_authentication")
+})
+
+test("selected demo preset reason overrides the generic Razorpay failure reason", async () => {
+  const context = harness()
+  let failureHandler: ((response: { error?: Record<string, string> }) => void) | undefined
+  context.dependencies.createCheckout = received => {
+    return { open() {}, on: (_event, handler) => { failureHandler = handler } }
+  }
+  await startCheckoutFlow(500, {
+    ...context.dependencies,
+    failureReason: "authentication_failed",
+  })
+  failureHandler?.({ error: { reason: "payment_failed" } })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.equal(context.events[0]?.reason, "authentication_failed")
 })
 
 test("script-load failure is propagated with a visible-safe message", async () => {
@@ -170,4 +207,23 @@ test("checkout feature does not alter existing dashboard source", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8")
   assert.match(source, /getBatchSummary/)
   assert.doesNotMatch(source, /razorpay/i)
+})
+
+test("demo aid documents the four failure scenarios without pretending to fill hosted card fields", async () => {
+  const presets = await readFile(new URL("./demo-card-presets.ts", import.meta.url), "utf8")
+  const page = await readFile(new URL("../app/razorpay-test/page.tsx", import.meta.url), "utf8")
+  for (const card of ["4100280000020007", "4100280000080001", "4100280000000009", "4100280000090000"]) {
+    assert.match(presets, new RegExp(card))
+  }
+  assert.match(page, /cannot be safely auto-filled/i)
+  assert.match(page, /Payment Failure Simulator \(Razorpay Sandbox\)/)
+  assert.doesNotMatch(page, /Simulated connection \(fallback demo control\)/)
+  assert.doesNotMatch(presets, /label: "Success"/)
+})
+
+test("agent trace viewer includes the five explicit reasoning stages", async () => {
+  const source = await readFile(new URL("../components/transactions/agent-trace-viewer.tsx", import.meta.url), "utf8")
+  for (const stage of ["Observe", "Classify", "Decide", "Guardrail Check", "Act"]) {
+    assert.match(source, new RegExp(stage))
+  }
 })

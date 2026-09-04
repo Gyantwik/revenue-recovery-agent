@@ -2,7 +2,9 @@ import { RootCause, TransactionOutcome, CaseType, ActionTaken, ROOT_CAUSE_CONFIG
 import type { Transaction } from "./types"
 
 type LegacyMockTransaction = Omit<Transaction,
-  "lifecycle_state" | "next_eligible_action_at" | "recovery_window_expires_at" | "history">
+  "lifecycle_state" | "next_eligible_action_at" | "recovery_window_expires_at" | "history"
+  | "customer_ref" | "source" | "verification_result" | "detail" | "gateway_error_reason"
+  | "gateway_order_id" | "gateway_payment_id" | "escalation_reason">
 
 const LEGACY_MOCK_TRANSACTIONS: LegacyMockTransaction[] = [
   {
@@ -1446,6 +1448,17 @@ export const MOCK_TRANSACTIONS: Transaction[] = LEGACY_MOCK_TRANSACTIONS.map(tra
   next_eligible_action_at: null,
   recovery_window_expires_at: null,
   history: [],
+  customer_ref: "Synthetic customer",
+  source: "seeded_reference",
+  verification_result: transaction.action_taken === "verify_status"
+    ? transaction.outcome === "recovered" ? "confirmed_success" : "confirmed_failed_retry_blocked"
+    : null,
+  detail: JSON.stringify({ signals: transaction.signals_used }),
+  gateway_error_reason: null,
+  gateway_order_id: null,
+  gateway_payment_id: null,
+  escalation_reason: transaction.action_taken === "verify_status" && transaction.outcome !== "recovered"
+    ? "BANK_PENDING_FINAL_STATUS_UNKNOWN" : null,
 }))
 
 export interface RecoverySummaryStats {

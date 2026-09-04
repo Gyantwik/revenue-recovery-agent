@@ -2,6 +2,7 @@ import React from "react"
 import { StatCards } from "@/components/summary/stat-cards"
 import { CauseBreakdown } from "@/components/summary/cause-breakdown"
 import { EscalatedCard } from "@/components/summary/escalated-card"
+import { PolicyImpactSimulator } from "@/components/summary/policy-impact-simulator"
 import { TransactionTable } from "@/components/transactions/transaction-table"
 import { ApiErrorState } from "@/components/api-error-state"
 import { getBatchSummary, getTransactions } from "@/lib/api"
@@ -33,7 +34,7 @@ export default async function DashboardPage() {
               Autonomous Revenue Recovery
             </h1>
             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
-              Synthetic Benchmark — 65 seeded cases
+              Synthetic Benchmark — 80 seeded cases
             </span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
@@ -52,6 +53,7 @@ export default async function DashboardPage() {
 
       {/* Top Level Metric Cards */}
       {summary && <StatCards summary={summary} transactions={transactions} />}
+      <PolicyImpactSimulator />
 
       {/* Cause Breakdown and Escalations */}
       {summary && (
@@ -79,7 +81,7 @@ export default async function DashboardPage() {
             View full dataset →
           </Link>
         </div>
-        {!apiError && <TransactionTable initialTransactions={transactions} />}
+        {!apiError && <TransactionTable initialTransactions={transactions.filter(transaction => transaction.is_at_risk)} />}
       </div>
     </div>
   )

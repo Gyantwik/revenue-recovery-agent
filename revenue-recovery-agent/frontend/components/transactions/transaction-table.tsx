@@ -31,6 +31,7 @@ export function TransactionTable({
   const [selectedCause, setSelectedCause] = useState<string>("all")
   const [selectedOutcome, setSelectedOutcome] = useState<string>(defaultOutcomeFilter)
   const [selectedCaseType, setSelectedCaseType] = useState<string>("all")
+  const [selectedSource, setSelectedSource] = useState<string>("all")
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [transactions, setTransactions] = useState(initialTransactions)
@@ -43,14 +44,16 @@ export function TransactionTable({
       caseType: selectedCaseType,
       rootCause: selectedCause,
       outcome: selectedOutcome,
+      source: selectedSource,
     })
-  }, [transactions, searchTerm, selectedCause, selectedOutcome, selectedCaseType])
+  }, [transactions, searchTerm, selectedCause, selectedOutcome, selectedCaseType, selectedSource])
 
   const resetFilters = () => {
     setSearchTerm("")
     setSelectedCause("all")
     setSelectedOutcome("all")
     setSelectedCaseType("all")
+    setSelectedSource("all")
   }
 
   const handleRowClick = (txn: Transaction) => {
@@ -109,6 +112,13 @@ export function TransactionTable({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <select value={selectedSource} onChange={(e) => setSelectedSource(e.target.value)}
+            aria-label="Transaction source"
+            className="text-xs sm:text-sm font-medium border border-input rounded-md px-3 py-2 bg-background">
+            <option value="all">All Sources</option>
+            <option value="live">Live</option>
+            <option value="seeded_reference">Reference</option>
+          </select>
           {/* Case Type Filter */}
           <select
             value={selectedCaseType}
@@ -148,7 +158,7 @@ export function TransactionTable({
             ))}
           </select>
 
-          {(searchTerm !== "" || selectedCause !== "all" || selectedOutcome !== "all" || selectedCaseType !== "all") && (
+          {(searchTerm !== "" || selectedCause !== "all" || selectedOutcome !== "all" || selectedCaseType !== "all" || selectedSource !== "all") && (
             <Button
               variant="ghost"
               size="sm"
@@ -168,7 +178,7 @@ export function TransactionTable({
             <TableHeader className="bg-muted/40">
               <TableRow>
                 <TableHead className="w-[110px]">Event ID</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead title="Payment Degradation = one-time checkout failure; Mandate Renewal = recurring auto-debit failure">Type ⓘ</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Failure Root Cause</TableHead>
                 <TableHead>Action Taken</TableHead>
@@ -186,6 +196,9 @@ export function TransactionTable({
                 >
                   <TableCell className="font-mono text-xs font-bold text-foreground">
                     {txn.event_id}
+                    <span className="ml-1 rounded border px-1 py-0.5 text-[9px] font-sans font-medium text-muted-foreground">
+                      {txn.source === "live" ? "LIVE" : "REFERENCE"}
+                    </span>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {CASE_TYPE_LABELS[txn.case_type] || txn.case_type}
@@ -194,15 +207,17 @@ export function TransactionTable({
                     {formatCurrency(txn.amount, txn.currency)}
                   </TableCell>
                   <TableCell>
-                    <CauseBadge cause={txn.root_cause} />
+                    {txn.is_at_risk
+                      ? <CauseBadge cause={txn.root_cause} />
+                      : <span className="inline-flex rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">Safely settled</span>}
                   </TableCell>
                   <TableCell className="text-xs text-foreground font-medium">
-                    {ACTION_LABELS[txn.action_taken] || txn.action_taken}
+                    {txn.is_at_risk ? (ACTION_LABELS[txn.action_taken] || txn.action_taken) : "No recovery required"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 text-xs font-semibold">
                       <span className={txn.attempt_number >= txn.max_attempts_allowed && txn.max_attempts_allowed > 0 ? "text-amber-600 font-bold" : "text-foreground"}>
-                        {formatAttemptCount(txn.attempt_number, txn.max_attempts_allowed)}
+                        {txn.is_at_risk ? formatAttemptCount(txn.attempt_number, txn.max_attempts_allowed) : "N/A (no risk)"}
                       </span>
                     </div>
                   </TableCell>
@@ -241,7 +256,7 @@ export function TransactionTable({
 
         <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            Showing <strong>{filteredTransactions.length}</strong> of <strong>{transactions.length}</strong> failure events
+            Showing <strong>{filteredTransactions.length}</strong> of <strong>{transactions.length}</strong> transactions
           </span>
           <span className="hidden sm:inline">
             Click any row to inspect signals used, policy match rules, and live triggers.

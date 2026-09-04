@@ -33,7 +33,7 @@ class RazorpayMissingConfigurationTest {
 
         mockMvc.perform(get("/api/batch-summary"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total_cases").value(65));
+                .andExpect(jsonPath("$.total_cases").value(80));
 
         mockMvc.perform(get("/api/razorpay/test/config"))
                 .andExpect(status().isServiceUnavailable())

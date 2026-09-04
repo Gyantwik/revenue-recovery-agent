@@ -11,6 +11,7 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 public interface RazorpayTestOrderRepository extends JpaRepository<RazorpayTestOrder, Long> {
+    Optional<RazorpayTestOrder> findByRazorpayOrderId(String razorpayOrderId);
     Optional<RazorpayTestOrder> findByInternalRequestId(String internalRequestId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

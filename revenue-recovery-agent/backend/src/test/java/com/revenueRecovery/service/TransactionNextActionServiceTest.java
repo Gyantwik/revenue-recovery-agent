@@ -58,28 +58,23 @@ class TransactionNextActionServiceTest {
     }
 
     @Test
-    void cancellationIsBlockedButAuthenticationFailureAllowsVoluntaryCheckout() {
+    void cancellationAndAuthenticationFailureArePolicyStops() {
         assertDecision(decide(record("cancelled", RootCause.USER_CANCELLED, Outcome.STOPPED_CORRECTLY,
                 LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.STOPPED_BY_POLICY, NextActionType.NONE, false);
         assertDecision(decide(record("pin", RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY,
-                LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.TRY_PAYMENT_AGAIN_SECURELY,
-                NextActionType.OPEN_RECOVERY_CHECKOUT, true);
+                LifecycleState.STOPPED, 0, 0)), NextRecoveryAction.STOPPED_BY_POLICY,
+                NextActionType.NONE, false);
     }
 
     @Test
-    void activeIncorrectPinCheckoutReportsPendingInsteadOfStopped() {
+    void legacyIncorrectPinCheckoutCannotOverrideTheStopPolicy() {
         AuditRecord record = record("TXN10006", RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY,
                 LifecycleState.STOPPED, 0, 0);
-        TransactionRecoveryPaymentLink link = new TransactionRecoveryPaymentLink();
-        link.setStatus(RazorpayCheckoutEventService.UNVERIFIED);
-        link.setCreatedAt(Instant.now());
-        when(transactionLinkRepository.findByEventEventId("TXN10006")).thenReturn(Optional.of(link));
-
         NextRecoveryActionResponse result = decide(record);
 
-        assertEquals(NextActionType.RESUME_RECOVERY_CHECKOUT, result.actionType());
-        assertEquals("recovery_payment_pending", result.lifecycleState());
-        assertTrue(result.actionAllowed());
+        assertEquals(NextActionType.NONE, result.actionType());
+        assertEquals("stopped", result.lifecycleState());
+        assertFalse(result.actionAllowed());
     }
 
     @Test
@@ -121,18 +116,16 @@ class TransactionNextActionServiceTest {
     }
 
     @Test
-    void exhaustedBankAndMandateRetriesAllowVoluntaryCheckoutButWeakNetworkDoesNot() {
+    void exhaustedBankAndWeakNetworkAreBlockedWhileMandateCanUseDifferentMechanism() {
         NextRecoveryActionResponse weak = decide(record("weak", RootCause.WEAK_NETWORK,
                 Outcome.NOT_RECOVERED, LifecycleState.RETRY_EXHAUSTED, 2, 2));
         assertDecision(weak, NextRecoveryAction.VERIFY_PAYMENT_STATUS, NextActionType.NONE, false);
-        for (RootCause cause : new RootCause[] { RootCause.BANK_TEMP_ERROR,
-                RootCause.MANDATE_FAILED_RETRYABLE }) {
-            NextRecoveryActionResponse result = decide(record("exhausted-" + cause.name(), cause,
-                    Outcome.NOT_RECOVERED, LifecycleState.RETRY_EXHAUSTED, 2, 2));
-            assertDecision(result, cause == RootCause.BANK_TEMP_ERROR
-                            ? NextRecoveryAction.TRY_PAYMENT_AGAIN : NextRecoveryAction.PAY_MANUALLY,
-                    NextActionType.OPEN_RECOVERY_CHECKOUT, true);
-        }
+        NextRecoveryActionResponse bank = decide(record("exhausted-bank", RootCause.BANK_TEMP_ERROR,
+                Outcome.NOT_RECOVERED, LifecycleState.RETRY_EXHAUSTED, 2, 2));
+        assertDecision(bank, NextRecoveryAction.ESCALATE_AFTER_RETRY_EXHAUSTED, NextActionType.NONE, false);
+        NextRecoveryActionResponse mandate = decide(record("exhausted-mandate", RootCause.MANDATE_FAILED_RETRYABLE,
+                Outcome.NOT_RECOVERED, LifecycleState.RETRY_EXHAUSTED, 2, 2));
+        assertDecision(mandate, NextRecoveryAction.PAY_MANUALLY, NextActionType.OPEN_RECOVERY_CHECKOUT, true);
     }
 
     @Test
@@ -141,8 +134,8 @@ class TransactionNextActionServiceTest {
                 LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.RESUME_PAYMENT,
                 NextActionType.OPEN_RECOVERY_CHECKOUT, true);
         assertDecision(decide(record("balance", RootCause.INSUFFICIENT_BALANCE, Outcome.NOT_RECOVERED,
-                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.CHOOSE_ANOTHER_PAYMENT_METHOD,
-                NextActionType.OPEN_RECOVERY_CHECKOUT, true);
+                LifecycleState.NOT_RECOVERED, 1, 1)), NextRecoveryAction.SEND_ALT_PAYMENT_LINK,
+                NextActionType.NONE, false);
     }
 
     @Test

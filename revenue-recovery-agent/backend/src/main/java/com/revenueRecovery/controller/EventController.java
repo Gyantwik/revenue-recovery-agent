@@ -4,11 +4,13 @@ import com.revenueRecovery.controller.dto.AuditRecordResponse;
 import com.revenueRecovery.controller.dto.NextRecoveryActionResponse;
 import com.revenueRecovery.controller.dto.TransactionRecoveryOrderResponse;
 import com.revenueRecovery.controller.dto.TransactionRecoveryStatusResponse;
+import com.revenueRecovery.controller.dto.AgentDecisionTraceResponse;
 import com.revenueRecovery.repository.AuditRecordRepository;
 import com.revenueRecovery.repository.AuditHistoryRepository;
 import com.revenueRecovery.service.TransactionNextActionService;
 import com.revenueRecovery.service.TransactionRecoveryCheckoutService;
 import com.revenueRecovery.service.TransactionRecoveryStatusService;
+import com.revenueRecovery.service.AgentTraceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,22 +33,31 @@ public class EventController {
     private final TransactionNextActionService nextActionService;
     private final TransactionRecoveryCheckoutService recoveryCheckoutService;
     private final TransactionRecoveryStatusService recoveryStatusService;
+    private final AgentTraceService agentTraceService;
 
     public EventController(AuditRecordRepository auditRecordRepository,
             AuditHistoryRepository auditHistoryRepository,
             TransactionNextActionService nextActionService,
             TransactionRecoveryCheckoutService recoveryCheckoutService,
-            TransactionRecoveryStatusService recoveryStatusService) {
+            TransactionRecoveryStatusService recoveryStatusService,
+            AgentTraceService agentTraceService) {
         this.auditRecordRepository = auditRecordRepository;
         this.auditHistoryRepository = auditHistoryRepository;
         this.nextActionService = nextActionService;
         this.recoveryCheckoutService = recoveryCheckoutService;
         this.recoveryStatusService = recoveryStatusService;
+        this.agentTraceService = agentTraceService;
     }
 
     @GetMapping("/{eventId}/next-action")
     public NextRecoveryActionResponse getNextAction(@PathVariable String eventId) {
         return nextActionService.decide(eventId);
+    }
+
+    @GetMapping("/{eventId}/agent-trace")
+    public java.util.List<AgentDecisionTraceResponse> getAgentTrace(@PathVariable String eventId) {
+        if (auditRecordRepository.findByEventId(eventId).isEmpty()) throw new com.revenueRecovery.service.TransactionNotFoundException(eventId);
+        return agentTraceService.get(eventId).stream().map(AgentDecisionTraceResponse::from).toList();
     }
 
     @PostMapping("/{eventId}/recovery-checkout")

@@ -22,15 +22,19 @@ import {
   getTransaction,
   recordRazorpayCheckoutEvent,
   verifyRazorpayTestPayment,
+  createPaymentReservation,
+  simulateReservationReconnect,
 } from "@/lib/api"
 import { formatRecoveryStatus, getNextActionInteraction, getRecoveryDemoHref } from "@/lib/next-recovery-action"
 import { createSingleFlightRunner, loadRazorpayCheckoutScript } from "@/lib/razorpay-checkout"
 import { startTransactionRecoveryFlow, type TransactionRecoveryFlowState } from "@/lib/transaction-recovery"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
+import { formatAttemptCount } from "@/lib/utils"
+import { GeminiAiCard } from "./gemini-ai-card"
+import { ExplainabilityCard } from "./explainability-card"
 import {
   ExternalLink,
   Info,
-  Radio,
   Loader2,
   ShieldAlert,
 } from "lucide-react"
@@ -148,6 +152,20 @@ export function TransactionDetailDialog({
     }
   }
 
+  const handleReservation = async () => {
+    if (!transaction || !decision || recoveryRunning) return
+    setRecoveryRunning(true)
+    try {
+      if (decision.action_type === "CREATE_RESERVATION") await createPaymentReservation(transaction.event_id)
+      else await simulateReservationReconnect(transaction.event_id)
+      await refreshTransactionState(transaction.event_id)
+    } catch (error) {
+      setRecoveryState({ message: error instanceof Error ? error.message : "Reservation action failed.", status: "error" })
+    } finally {
+      setRecoveryRunning(false)
+    }
+  }
+
   if (!transaction) return null
 
   return (
@@ -164,6 +182,8 @@ export function TransactionDetailDialog({
               </div>
               <DialogDescription className="text-xs text-muted-foreground mt-1">
                 Timestamp: {formatDateTime(transaction.timestamp)} • {CASE_TYPE_LABELS[transaction.case_type]}
+                {` • ${transaction.source === "live" ? "Test-mode integration event" : "Seeded reference"}`}
+                {` • At risk: ${transaction.is_at_risk ? "Yes" : "No"}`}
               </DialogDescription>
             </div>
             <div className="text-right">
@@ -185,26 +205,8 @@ export function TransactionDetailDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Classification & Confidence */}
-          <div className="p-3.5 rounded-lg bg-muted/40 border space-y-2">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                AI Root Cause & Classification
-              </h4>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-background border">
-                Confidence: {(transaction.classification_confidence * 100).toFixed(0)}%
-              </span>
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <CauseBadge cause={transaction.root_cause} />
-              <span className="text-xs text-muted-foreground">
-                Matched Policy: <strong>{transaction.policy_rule_matched}</strong>
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              At risk: <strong>{transaction.is_at_risk ? "Yes" : "No"}</strong>
-            </p>
-          </div>
+          <GeminiAiCard transaction={transaction} />
+          {transaction.outcome !== "recovered" && <ExplainabilityCard eventId={transaction.event_id} />}
 
           {/* Backend-owned next action: this card never derives policy from UI strings. */}
           <div className="p-3.5 rounded-lg border border-teal-200 bg-teal-50/40 dark:border-teal-900 dark:bg-teal-950/20 space-y-3">
@@ -238,7 +240,13 @@ export function TransactionDetailDialog({
                   recoveryRunning={recoveryRunning}
                   onRecoveryCheckout={() => { void handleRecoveryCheckout() }}
                   onStatusCheck={() => { void handleStatusCheck() }}
+                  onReservation={() => { void handleReservation() }}
                 />
+                {transaction.outcome !== "recovered" && decision.attempts_made >= decision.max_attempts && decision.max_attempts > 0 && (
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    Retry limit reached — manual review or escalation required.
+                  </p>
+                )}
                 {["OPEN_RECOVERY_CHECKOUT", "RESUME_RECOVERY_CHECKOUT"].includes(decision.action_type) && (
                   <p className="text-xs text-muted-foreground">
                     Razorpay Test Mode — no real money is charged. The customer must voluntarily complete Checkout.
@@ -255,37 +263,21 @@ export function TransactionDetailDialog({
             )}
           </div>
 
-          {/* Signals Used */}
-          <div className="p-3.5 rounded-lg border bg-card space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Radio className="h-3.5 w-3.5 text-primary" /> Detection Signals Used
-            </h4>
-            <div className="flex flex-wrap gap-1.5">
-              {transaction.signals_used.map((signal, idx) => (
-                <span
-                  key={idx}
-                  className="font-mono text-xs px-2.5 py-1 rounded bg-muted text-foreground border"
-                >
-                  {signal}
-                </span>
-              ))}
-              {transaction.signals_used.length === 0 && (
-                <span className="text-xs text-muted-foreground">No signals recorded</span>
-              )}
-            </div>
-          </div>
-
-          {/* Execution & Attempts */}
-          <div className="p-3.5 rounded-lg border bg-card space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Policy Action & Attempt Tracking
-            </h4>
+          <details className="rounded-lg border bg-card p-3.5">
+            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-muted-foreground">Technical audit details</summary>
+            <div className="mt-4 space-y-4">
+            <div className="space-y-2"><h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Detection Signals</h4><div className="flex flex-wrap gap-1.5">
+              {transaction.signals_used.map((signal, idx) => <span key={idx} className="font-mono text-xs px-2.5 py-1 rounded bg-muted text-foreground border">{signal}</span>)}
+              {transaction.signals_used.length === 0 && <span className="text-xs text-muted-foreground">No signals recorded</span>}
+            </div></div>
+            <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Policy Action & Attempt Tracking</h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="p-2.5 rounded bg-muted/30 border">
                 <span className="text-muted-foreground block text-[11px]">Action Taken:</span>
                 <span className="font-semibold text-foreground text-sm">
-                  {ACTION_LABELS[transaction.action_taken] || transaction.action_taken}
+                  {transaction.is_at_risk ? (ACTION_LABELS[transaction.action_taken] || transaction.action_taken) : "No recovery required"}
                 </span>
               </div>
               <div className="p-2.5 rounded bg-muted/30 border">
@@ -297,7 +289,7 @@ export function TransactionDetailDialog({
               <div className="p-2.5 rounded bg-muted/30 border">
                 <span className="text-muted-foreground block text-[11px]">Attempts Made / Max:</span>
                 <span className="font-bold text-foreground text-sm">
-                  {transaction.attempt_number}/{transaction.max_attempts_allowed}
+                  {transaction.is_at_risk ? formatAttemptCount(transaction.attempt_number, transaction.max_attempts_allowed) : "N/A (no risk)"}
                 </span>
               </div>
               <div className="p-2.5 rounded bg-muted/30 border">
@@ -318,10 +310,10 @@ export function TransactionDetailDialog({
                 </p>
               </div>
             )}
-          </div>
+            </div>
 
           {transaction.history.length > 0 && (
-            <div className="p-3.5 rounded-lg border bg-card space-y-3">
+            <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Audit Timeline</h4>
               <ol className="space-y-3 border-l pl-4">
                 {transaction.history.map((entry, index) => (
@@ -334,6 +326,8 @@ export function TransactionDetailDialog({
               </ol>
             </div>
           )}
+          </div>
+          </details>
 
           {/* Closing the modal is the only generic action; policy actions live in the decision card. */}
           <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t">
@@ -367,6 +361,7 @@ function DecisionButton({
   recoveryRunning,
   onRecoveryCheckout,
   onStatusCheck,
+  onReservation,
 }: {
   decision: NextRecoveryActionDecision
   acknowledged: boolean
@@ -374,9 +369,20 @@ function DecisionButton({
   recoveryRunning: boolean
   onRecoveryCheckout: () => void
   onStatusCheck: () => void
+  onReservation: () => void
 }) {
   const interaction = getNextActionInteraction(decision)
   const demoHref = getRecoveryDemoHref(decision)
+
+  if (interaction === "reservation") {
+    return (
+      <Button type="button" size="sm" className="gap-1.5 text-xs"
+        disabled={recoveryRunning} onClick={onReservation}>
+        {recoveryRunning && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        {decision.button_label}
+      </Button>
+    )
+  }
 
   if (interaction === "recovery_checkout") {
     return (

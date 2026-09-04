@@ -6,7 +6,48 @@ export type LifecycleState =
   | "retry_exhausted" | "recovered" | "not_recovered" | "stopped" | "escalated"
   | "recovered_by_verified_test_payment"
 
-export type AuditActor = "system_simulation" | "merchant_manual"
+export type AuditActor = "system_simulation" | "merchant_manual" | "razorpay_test_verification" | "reservation_system"
+export type TransactionSource = "live" | "seeded_reference"
+export type VerificationResult = "confirmed_success" | "still_pending" | "confirmed_failed_retry_blocked"
+export type AgentTraceStage = "observe" | "classify" | "decide" | "guardrail_check" | "act"
+export interface AgentDecisionTrace {
+  event_id: string
+  stage: AgentTraceStage
+  summary: string
+  detail: string
+  actor: AuditActor
+  timestamp: string
+}
+
+export type AiTraceStage = "OBSERVE" | "CLASSIFY" | "DECIDE" | "GUARDRAIL_CHECK" | "ACT"
+
+export interface AiTraceStep {
+  stage: AiTraceStage
+  thought: string
+  conclusion: string
+}
+
+export interface AiAnalysisResponse {
+  event_id: string
+  predicted_root_cause: RootCause
+  confidence: number
+  recommended_action: ActionTaken
+  ai_explanation: string
+  optimal_retry_timing: string
+  risk_assessment: string
+  reasoning_trace: AiTraceStep[]
+  analysis_source: "gemini" | "rules_based"
+}
+
+export type AiMessageChannel = "WHATSAPP" | "SMS" | "EMAIL"
+
+export interface AiMessageResponse {
+  event_id: string
+  channel: string
+  subject: string
+  message: string
+  suggested_cta: string
+}
 
 export interface AuditHistoryEntry {
   timestamp: string
@@ -46,6 +87,14 @@ export interface Transaction {
   next_eligible_action_at: string | null
   recovery_window_expires_at: string | null
   history: AuditHistoryEntry[]
+  customer_ref: string
+  source: TransactionSource
+  verification_result: VerificationResult | null
+  detail: string
+  gateway_error_reason: string | null
+  gateway_order_id: string | null
+  gateway_payment_id: string | null
+  escalation_reason: string | null
 }
 
 export interface ActionResult {
@@ -73,9 +122,12 @@ export type NextRecoveryAction =
   | "PAY_MANUALLY"
   | "SEND_RECOVERY_LINK"
   | "SEND_ALT_PAYMENT_LINK"
+  | "RESERVE_PAYMENT"
+  | "COMPLETE_RESERVATION"
 
 export type NextActionType = "NONE" | "DISPLAY_INFORMATION" | "OPEN_RECOVERY_CHECKOUT"
   | "RESUME_RECOVERY_CHECKOUT" | "CHECK_PAYMENT_STATUS" | "OPEN_TEST_MODE_RECOVERY_CHECKOUT"
+  | "CREATE_RESERVATION" | "SIMULATE_RECONNECT"
 export type NextActionMode = "synthetic_benchmark" | "razorpay_test_recovery" | "razorpay_test_demo"
 
 export interface NextRecoveryActionDecision {
@@ -125,6 +177,35 @@ export interface BatchSummary {
   escalated_summary: EscalatedSummary[]
 }
 
+export interface ExplainabilityResponse {
+  event_id: string
+  signals_used: string[]
+  root_cause: RootCause
+  classification_confidence: number
+  policy_rule_matched: string
+  allowed_action: ActionTaken
+  attempt_number: number
+  max_attempts_allowed: number
+  was_blocked: boolean
+  block_reason: string | null
+  outcome: TransactionOutcome
+  recovered_amount: number
+}
+
+export interface PolicyImpactResponse {
+  root_cause: RootCause | null
+  policy_rule: string | null
+  allowed_action: ActionTaken | null
+  eligible_cases: number
+  recoverable_amount: number
+  expected_recovery_rate: number
+  cases_blocked_for_safety: number
+  blocked_amount: number
+  at_risk_cases: number
+  not_at_risk_cases: number
+  total_cases_considered: number
+}
+
 export interface RazorpayTestOrder {
   internal_request_id: string
   razorpay_order_id: string
@@ -149,6 +230,13 @@ export interface RazorpayCheckoutEventRequest {
   razorpay_signature?: string
   event_type: RazorpayCheckoutEventType
   reason?: string
+  customer_ref?: string
+  error_code?: string
+  error_description?: string
+  error_source?: string
+  error_step?: string
+  latency_ms?: number
+  simulated_connection?: boolean
 }
 
 export interface RazorpayCheckoutEvent {

@@ -6,6 +6,7 @@ import com.revenueRecovery.model.enums.NextActionType;
 import com.revenueRecovery.model.enums.NextRecoveryAction;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RecoveryCheckoutAction;
+import com.revenueRecovery.model.enums.TransactionSource;
 import com.revenueRecovery.repository.TransactionRecoveryPaymentLinkRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -105,21 +106,28 @@ public class RecoveryTransactionEligibilityService {
             case CHECKOUT_ABANDONED -> allowed(RecoveryCheckoutAction.RESUME_PAYMENT,
                     "Resume Payment", "Customer payment can be resumed",
                     "Checkout was abandoned before payment completion.");
-            case INSUFFICIENT_BALANCE -> allowed(RecoveryCheckoutAction.CHOOSE_ANOTHER_PAYMENT_METHOD,
-                    "Choose Another Payment Method", "A voluntary alternative payment can be attempted",
-                    "The customer may add funds or choose another payment method.");
-            case INCORRECT_PIN -> allowed(RecoveryCheckoutAction.TRY_PAYMENT_AGAIN_SECURELY,
-                    "Try Payment Again Securely", "Customer-initiated secure retry is available",
-                    "Automatic retry is blocked, but the customer may voluntarily retry in hosted Checkout.");
+            case INSUFFICIENT_BALANCE -> blocked(NextRecoveryAction.SEND_ALT_PAYMENT_LINK,
+                    "Alternative Payment Link Sent", "At Risk (Merchant)",
+                    "No retry of the failed funding source is allowed. A one-time customer-initiated alternative payment method is available until the recovery window expires.",
+                    "Use the separately generated alternative payment link with another method before the recovery window expires.",
+                    "No retry or recovery-payment button is offered for this cause.", NONE, 0);
+            case INCORRECT_PIN -> blocked(NextRecoveryAction.STOPPED_BY_POLICY,
+                    "No Recovery Payment", "Authentication Failed (e.g. incorrect PIN/OTP)",
+                    "This is a security-related policy stop.",
+                    "The customer must re-initiate a fresh purchase themselves.",
+                    "Automated and operator-triggered recovery are blocked.", NONE, 0);
             case BANK_TEMP_ERROR -> retryExhausted(record)
-                    ? allowed(RecoveryCheckoutAction.TRY_PAYMENT_AGAIN, "Try Payment Again",
-                            "Customer can make a voluntary payment attempt",
-                            "Automatic bank-error retries are exhausted.")
-                    : blocked(NextRecoveryAction.AWAIT_SCHEDULED_RETRY, "Retry Scheduled",
-                            "A bounded automatic retry remains scheduled",
-                            "The existing retry policy still has an attempt available.",
-                            "Wait for the scheduled retry before offering another Checkout.",
-                            "Creating another order now could duplicate the payment attempt.", NONE, 0);
+                    ? blocked(NextRecoveryAction.ESCALATE_AFTER_RETRY_EXHAUSTED, "Retry Limit Reached",
+                            "Bank retry allowance exhausted", "The hard two-attempt ceiling has been reached.",
+                            "Escalate or use a genuinely different recovery mechanism.",
+                            "No further retry of the same kind is permitted.", NONE, 0)
+                    : record.getLifecycleState() == com.revenueRecovery.model.enums.LifecycleState.RETRY_SCHEDULED
+                    ? blocked(NextRecoveryAction.AWAIT_SCHEDULED_RETRY, "Retry Scheduled",
+                            "A bounded bank retry remains scheduled", "Wait for the scheduled retry to finish.",
+                            "Do not create a duplicate payment while the retry is scheduled.",
+                            "A second payment could duplicate collection.", NONE, 0)
+                    : allowed(RecoveryCheckoutAction.TRY_PAYMENT_AGAIN, "Retry Payment",
+                            "Temporary bank failure can be retried", "A bounded retry remains available.");
             case MANDATE_FAILED_RETRYABLE -> retryExhausted(record)
                     ? allowed(RecoveryCheckoutAction.PAY_MANUALLY, "Pay Manually",
                             "A voluntary one-time payment is available",
@@ -133,10 +141,10 @@ public class RecoveryTransactionEligibilityService {
                     "A voluntary one-time payment is available",
                     "The expired mandate cannot be debited; a new customer-authorized one-time payment is allowed.");
             case PAYMENT_PENDING -> blocked(NextRecoveryAction.VERIFY_PAYMENT_STATUS,
-                    "Verify Payment Status First", "Original payment outcome is uncertain",
-                    "The payment is pending and may still complete.",
-                    "Confirm the existing payment status before attempting a new charge.",
-                    "Creating another payment now could cause duplicate debit.", NONE, 0);
+                    "Verify Status", "Original payment outcome is uncertain",
+                    "Payment is still processing at the bank. Do not create a new payment — wait for the bank's final status. If the customer complains, manually verify the payment status before taking any action.",
+                    "Wait for and manually verify the bank's final status.",
+                    "Creating another payment now could cause duplicate debit.", NONE, 0).asInformation();
             case WEAK_NETWORK -> blocked(NextRecoveryAction.VERIFY_PAYMENT_STATUS,
                     "Verify Previous Payment First", "Previous payment outcome must be confirmed",
                     "A network or client timeout does not prove that the original payment failed.",
@@ -144,8 +152,8 @@ public class RecoveryTransactionEligibilityService {
                     "A second payment could duplicate a delayed debit.", NONE, 0);
             case USER_CANCELLED -> blocked(NextRecoveryAction.STOPPED_BY_POLICY,
                     "No Automatic Recovery Allowed", "Customer cancellation is protected",
-                    "User Cancelled cases cannot be recovered through a new payment.",
-                    "Respect the cancellation and do not create a recovery order.",
+                    "Customer actively cancelled this payment. Per policy, we do not offer an automated recovery payment — the customer must re-initiate the purchase themselves if they wish to proceed.",
+                    "Respect the cancellation; the customer may start a new purchase themselves.",
                     "No operator-triggered collection is allowed.", NONE, 0);
             case MERCHANT_GATEWAY_ISSUE -> blocked(NextRecoveryAction.ESCALATE_TO_MERCHANT,
                     "Merchant Review Required", "Merchant or gateway investigation is required",
@@ -223,6 +231,12 @@ public class RecoveryTransactionEligibilityService {
             return new RecoveryCheckoutDecision(allowed, recommendedAction, recoveryAction, actionType,
                     secondaryActionType, buttonLabel, secondaryButtonLabel, title, reason, nextStep,
                     riskNote, status, ageMinutes);
+        }
+
+        RecoveryCheckoutDecision asInformation() {
+            return new RecoveryCheckoutDecision(true, recommendedAction, recoveryAction, NextActionType.DISPLAY_INFORMATION,
+                    secondaryActionType, buttonLabel, secondaryButtonLabel, title, reason, nextStep,
+                    riskNote, existingLinkStatus, linkAgeMinutes);
         }
     }
 }

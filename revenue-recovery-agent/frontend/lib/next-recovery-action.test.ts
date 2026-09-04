@@ -93,7 +93,7 @@ test("all 65 seeded fixtures render dynamic backend eligibility without an event
   }
 })
 
-test("cancelled and recovered decisions remain disabled while PIN allows voluntary retry", () => {
+test("cancelled, authentication failures, and recovered decisions remain disabled", () => {
   for (const item of [
     decision({ recommended_action: "STOPPED_BY_POLICY", button_label: "No Further Action Allowed", is_action_allowed: false, action_type: "NONE" }),
     decision({ recommended_action: "ALREADY_RECOVERED", button_label: "Already Recovered", current_outcome: "recovered", lifecycle_state: "recovered", is_action_allowed: false, action_type: "NONE" }),
@@ -102,9 +102,9 @@ test("cancelled and recovered decisions remain disabled while PIN allows volunta
     assert.equal(getRecoveryDemoHref(item), null)
     assert.doesNotMatch(item.button_label, /Recover Amount|Mark Recovered/i)
   }
-  const pin = decision({ event_id: "PIN", button_label: "Try Payment Again Securely" })
-  assert.equal(getNextActionInteraction(pin), "recovery_checkout")
-  assert.match(pin.reason, /automatic.*blocked/i)
+  const pin = decision({ event_id: "PIN", recommended_action: "STOPPED_BY_POLICY",
+    button_label: "No Recovery Payment", is_action_allowed: false, action_type: "NONE" })
+  assert.equal(getNextActionInteraction(pin), "disabled")
 })
 
 test("payment status verification and scheduled retries cannot open Checkout", () => {
@@ -147,10 +147,9 @@ test("transaction modal loads the backend decision card and removes the old gene
   assert.doesNotMatch(source, /triggerTransactionAction|Run test-mode|Recover Amount|Mark Recovered/)
 })
 
-test("dedicated demo page reuses the existing verified recovery flow under the backend decision", () => {
+test("checkout page contains no hardcoded recovery demo case", () => {
   const source = readFileSync(new URL("../app/razorpay-test/page.tsx", import.meta.url), "utf8")
-  assert.match(source, /getNextRecoveryAction\(demo\.event_id\)/)
-  assert.match(source, /startRecoveryDemoFlow\(demoCase\.event_id/)
-  assert.match(source, /demoInteraction !== "test_mode_checkout"/)
+  assert.doesNotMatch(source, /TXN_DEMO_RECOVERY_001|Live Test Mode Recovery Demo/)
+  assert.match(source, /Payment Failure Simulator \(Razorpay Sandbox\)/)
   assert.doesNotMatch(source, /RAZORPAY_KEY_SECRET|razorpay_signature\s*[}:]/)
 })

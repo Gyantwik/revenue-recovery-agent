@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public interface AuditRecordRepository extends JpaRepository<AuditRecord, Long> {
     Optional<AuditRecord> findByEventId(String eventId);
+    Optional<AuditRecord> findByGatewayOrderId(String gatewayOrderId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from AuditRecord a where a.eventId = :eventId")

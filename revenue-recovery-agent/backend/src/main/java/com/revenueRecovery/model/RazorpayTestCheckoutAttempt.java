@@ -50,6 +50,19 @@ public class RazorpayTestCheckoutAttempt {
     @Column(name = "verification_failure_code", length = 50)
     private String verificationFailureCode;
 
+    @Column(name = "error_code", length = 100)
+    private String errorCode;
+    @Column(name = "error_description", length = 500)
+    private String errorDescription;
+    @Column(name = "error_source", length = 100)
+    private String errorSource;
+    @Column(name = "error_step", length = 100)
+    private String errorStep;
+    @Column(name = "customer_ref", length = 120)
+    private String customerRef;
+    @Column(name = "latency_ms")
+    private Long latencyMs;
+
     public Long getId() { return id; }
     public String getInternalRequestId() { return internalRequestId; }
     public void setInternalRequestId(String internalRequestId) { this.internalRequestId = internalRequestId; }
@@ -73,4 +86,16 @@ public class RazorpayTestCheckoutAttempt {
     public void setVerificationFailureCode(String verificationFailureCode) {
         this.verificationFailureCode = verificationFailureCode;
     }
+    public String getErrorCode() { return errorCode; }
+    public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
+    public String getErrorDescription() { return errorDescription; }
+    public void setErrorDescription(String errorDescription) { this.errorDescription = errorDescription; }
+    public String getErrorSource() { return errorSource; }
+    public void setErrorSource(String errorSource) { this.errorSource = errorSource; }
+    public String getErrorStep() { return errorStep; }
+    public void setErrorStep(String errorStep) { this.errorStep = errorStep; }
+    public String getCustomerRef() { return customerRef; }
+    public void setCustomerRef(String customerRef) { this.customerRef = customerRef; }
+    public Long getLatencyMs() { return latencyMs; }
+    public void setLatencyMs(Long latencyMs) { this.latencyMs = latencyMs; }
 }

@@ -33,14 +33,14 @@ class RecoveryTransactionEligibilityServiceTest {
     void safeCustomerInitiatedCategoriesHaveExactActions() {
         assertAllowed(RootCause.CHECKOUT_ABANDONED, Outcome.NOT_RECOVERED, 1, 1,
                 RecoveryCheckoutAction.RESUME_PAYMENT, "Resume Payment");
-        assertAllowed(RootCause.INSUFFICIENT_BALANCE, Outcome.NOT_RECOVERED, 1, 1,
-                RecoveryCheckoutAction.CHOOSE_ANOTHER_PAYMENT_METHOD, "Choose Another Payment Method");
-        assertAllowed(RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY, 0, 0,
-                RecoveryCheckoutAction.TRY_PAYMENT_AGAIN_SECURELY, "Try Payment Again Securely");
-        assertAllowed(RootCause.BANK_TEMP_ERROR, Outcome.NOT_RECOVERED, 2, 2,
-                RecoveryCheckoutAction.TRY_PAYMENT_AGAIN, "Try Payment Again");
         assertAllowed(RootCause.MANDATE_FAILED_RETRYABLE, Outcome.NOT_RECOVERED, 2, 2,
                 RecoveryCheckoutAction.PAY_MANUALLY, "Pay Manually");
+        assertBlocked(record(RootCause.INSUFFICIENT_BALANCE, Outcome.NOT_RECOVERED, 1, 1),
+                "Alternative Payment Link Sent");
+        assertBlocked(record(RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY, 0, 0),
+                "No Recovery Payment");
+        assertBlocked(record(RootCause.BANK_TEMP_ERROR, Outcome.NOT_RECOVERED, 2, 2),
+                "Retry Limit Reached");
     }
 
     @Test
@@ -52,8 +52,9 @@ class RecoveryTransactionEligibilityServiceTest {
 
     @Test
     void uncertainProtectedAndReviewCategoriesAreBlocked() {
-        assertBlocked(record(RootCause.PAYMENT_PENDING, Outcome.NOT_RECOVERED, 1, 1),
-                "Verify Payment Status First");
+        var pending = service.evaluate(record(RootCause.PAYMENT_PENDING, Outcome.NOT_RECOVERED, 1, 1));
+        assertTrue(pending.allowed());
+        assertEquals("Verify Status", pending.buttonLabel());
         assertBlocked(record(RootCause.WEAK_NETWORK, Outcome.NOT_RECOVERED, 2, 2),
                 "Verify Previous Payment First");
         assertBlocked(record(RootCause.USER_CANCELLED, Outcome.STOPPED_CORRECTLY, 0, 0),

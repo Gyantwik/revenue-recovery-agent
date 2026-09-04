@@ -26,15 +26,21 @@ public class RazorpayCheckoutEventService {
     private final RazorpayTestCheckoutAttemptRepository attemptRepository;
     private final RecoveryPaymentLinkRepository recoveryLinkRepository;
     private final TransactionRecoveryPaymentLinkRepository transactionLinkRepository;
+    private final LiveTransactionService liveTransactionService;
+    private final LiveRecoveryFailureService liveRecoveryFailureService;
 
     public RazorpayCheckoutEventService(RazorpayTestOrderRepository orderRepository,
             RazorpayTestCheckoutAttemptRepository attemptRepository,
             RecoveryPaymentLinkRepository recoveryLinkRepository,
-            TransactionRecoveryPaymentLinkRepository transactionLinkRepository) {
+            TransactionRecoveryPaymentLinkRepository transactionLinkRepository,
+            LiveTransactionService liveTransactionService,
+            LiveRecoveryFailureService liveRecoveryFailureService) {
         this.orderRepository = orderRepository;
         this.attemptRepository = attemptRepository;
         this.recoveryLinkRepository = recoveryLinkRepository;
         this.transactionLinkRepository = transactionLinkRepository;
+        this.liveTransactionService = liveTransactionService;
+        this.liveRecoveryFailureService = liveRecoveryFailureService;
     }
 
     @Transactional
@@ -66,6 +72,12 @@ public class RazorpayCheckoutEventService {
         attempt.setRazorpaySignature(blankToNull(request.razorpaySignature()));
         attempt.setEventType(request.eventType());
         attempt.setReason(trimmedOrNull(request.reason(), 100));
+        attempt.setErrorCode(trimmedOrNull(request.errorCode(), 100));
+        attempt.setErrorDescription(trimmedOrNull(request.errorDescription(), 500));
+        attempt.setErrorSource(trimmedOrNull(request.errorSource(), 100));
+        attempt.setErrorStep(trimmedOrNull(request.errorStep(), 100));
+        attempt.setCustomerRef(trimmedOrNull(request.customerRef(), 120));
+        attempt.setLatencyMs(request.latencyMs());
         attempt.setStatus(UNVERIFIED);
         attempt.setCreatedAt(now);
         try {
@@ -85,6 +97,21 @@ public class RazorpayCheckoutEventService {
             link.setStatus(UNVERIFIED);
             transactionLinkRepository.save(link);
         });
+
+        boolean linkedRecovery = recoveryLinkRepository.findByInternalRequestId(request.internalRequestId()).isPresent()
+                || transactionLinkRepository.findByInternalRequestId(request.internalRequestId()).isPresent();
+
+        // Standalone Checkout intake is represented on the live dashboard for both outcomes.
+        // A client-reported success remains pending until server-side verification; it is not
+        // marked recovered and it does not create synthetic audit history.
+        if (!linkedRecovery) {
+            liveTransactionService.record(order, request);
+        }
+
+        if (linkedRecovery && !success) {
+            liveRecoveryFailureService.recordIfLinked(request);
+        }
+
         return new RazorpayCheckoutEventResponse(request.internalRequestId(), request.razorpayOrderId(),
                 blankToNull(request.razorpayPaymentId()), request.eventType(), UNVERIFIED, now);
     }

@@ -4,6 +4,8 @@ import com.revenueRecovery.model.enums.ActionTaken;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RootCause;
 import com.revenueRecovery.model.enums.LifecycleState;
+import com.revenueRecovery.model.enums.TransactionSource;
+import com.revenueRecovery.model.enums.VerificationResult;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,7 +29,7 @@ public class AuditRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "event_id", nullable = false, length = 50)
+    @Column(name = "event_id", nullable = false, unique = true, length = 50)
     private String eventId;
 
     @Column(name = "case_type", length = 30)
@@ -97,6 +99,34 @@ public class AuditRecord {
     @Column(name = "recovery_window_expires_at", columnDefinition = "TIMESTAMP")
     private Instant recoveryWindowExpiresAt;
 
+    @Column(name = "customer_ref", length = 120)
+    private String customerRef;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "source", length = 30)
+    private TransactionSource source;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "verification_result", length = 50)
+    private VerificationResult verificationResult;
+
+    @Column(name = "detail", columnDefinition = "TEXT")
+    private String detail;
+
+    @Column(name = "gateway_error_reason", length = 100)
+    private String gatewayErrorReason;
+
+    @Column(name = "gateway_order_id", length = 50)
+    private String gatewayOrderId;
+
+    @Column(name = "gateway_payment_id", length = 50)
+    private String gatewayPaymentId;
+
+    @Column(name = "escalation_reason", length = 100)
+    private String escalationReason;
+
     public AuditRecord() {
     }
 
@@ -145,4 +175,20 @@ public class AuditRecord {
     public void setNextEligibleActionAt(Instant nextEligibleActionAt) { this.nextEligibleActionAt = nextEligibleActionAt; }
     public Instant getRecoveryWindowExpiresAt() { return recoveryWindowExpiresAt; }
     public void setRecoveryWindowExpiresAt(Instant recoveryWindowExpiresAt) { this.recoveryWindowExpiresAt = recoveryWindowExpiresAt; }
+    public String getCustomerRef() { return customerRef; }
+    public void setCustomerRef(String customerRef) { this.customerRef = customerRef; }
+    public TransactionSource getSource() { return source; }
+    public void setSource(TransactionSource source) { this.source = source; }
+    public VerificationResult getVerificationResult() { return verificationResult; }
+    public void setVerificationResult(VerificationResult verificationResult) { this.verificationResult = verificationResult; }
+    public String getDetail() { return detail; }
+    public void setDetail(String detail) { this.detail = detail; }
+    public String getGatewayErrorReason() { return gatewayErrorReason; }
+    public void setGatewayErrorReason(String gatewayErrorReason) { this.gatewayErrorReason = gatewayErrorReason; }
+    public String getGatewayOrderId() { return gatewayOrderId; }
+    public void setGatewayOrderId(String gatewayOrderId) { this.gatewayOrderId = gatewayOrderId; }
+    public String getGatewayPaymentId() { return gatewayPaymentId; }
+    public void setGatewayPaymentId(String gatewayPaymentId) { this.gatewayPaymentId = gatewayPaymentId; }
+    public String getEscalationReason() { return escalationReason; }
+    public void setEscalationReason(String escalationReason) { this.escalationReason = escalationReason; }
 }

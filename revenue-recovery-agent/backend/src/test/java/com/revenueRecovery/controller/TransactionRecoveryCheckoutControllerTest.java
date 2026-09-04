@@ -86,9 +86,10 @@ class TransactionRecoveryCheckoutControllerTest {
         bank.setLifecycleState(LifecycleState.RETRY_EXHAUSTED);
         auditRepository.saveAndFlush(bank);
         assertCreated("TXN10044", 95000, "RESUME_PAYMENT");
-        assertCreated("TXN10036", 110000, "CHOOSE_ANOTHER_PAYMENT_METHOD");
-        assertCreated("TXN10006", 55000, "TRY_PAYMENT_AGAIN_SECURELY");
-        assertCreated("TXN10014", 140000, "TRY_PAYMENT_AGAIN");
+        assertCreated("TXN10043", 315000, "RESUME_PAYMENT");
+        assertBlocked("TXN10036", "Alternative Payment Link Sent");
+        assertBlocked("TXN10006", "No Recovery Payment");
+        assertBlocked("TXN10014", "Retry Limit Reached");
 
         AuditRecord mandate = auditRepository.findByEventId("TXN10056").orElseThrow();
         mandate.setOutcome(Outcome.NOT_RECOVERED);
@@ -100,13 +101,16 @@ class TransactionRecoveryCheckoutControllerTest {
     @Test
     void blockedCategoriesReturnPolicyGuidanceAndNeverCreateOrder() throws Exception {
         makeNotRecovered("TXN10032");
-        assertBlocked("TXN10032", "Verify Payment Status First");
+        mockMvc.perform(get("/api/transactions/TXN10032/next-action"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.is_action_allowed").value(true))
+                .andExpect(jsonPath("$.action_type").value("DISPLAY_INFORMATION"))
+                .andExpect(jsonPath("$.button_label").value("Verify Status"));
         assertBlocked("TXN10022", "Verify Previous Payment First");
         assertBlocked("TXN10001", "No Automatic Recovery Allowed");
         assertBlocked("TXN10048", "Escalated for Review");
         assertBlocked("TXN10010", "Escalated for Review");
         assertBlocked("TXN10051", "Escalated for Review");
-        assertBlocked("TXN10043", "Already Recovered");
     }
 
     @Test

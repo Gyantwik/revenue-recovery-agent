@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Locale;
 
 public enum AuditActor {
-    SYSTEM_SIMULATION, MERCHANT_MANUAL, RAZORPAY_TEST_VERIFICATION;
+    SYSTEM_SIMULATION, MERCHANT_MANUAL, RAZORPAY_TEST_VERIFICATION, RESERVATION_SYSTEM;
 
     @JsonValue
     public String toJson() { return name().toLowerCase(Locale.ROOT); }

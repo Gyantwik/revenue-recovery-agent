@@ -66,6 +66,19 @@ public class RevenueRecoveryPipeline {
                 .orElseGet(() -> eventRepository.save(event));
 
         DetectionResult detection = detectionService.detect(normalizedEvent);
+        if (!detection.isAtRisk()) {
+            AuditRecord safe = new AuditRecord();
+            safe.setEventId(normalizedEvent.getEventId()); safe.setCaseType(normalizedEvent.getCaseType());
+            safe.setAmount(normalizedEvent.getAmount()); safe.setCurrency(normalizedEvent.getCurrency());
+            safe.setTimestamp(normalizedEvent.getTimestamp()); safe.setIsAtRisk(false);
+            safe.setRiskAmount(java.math.BigDecimal.ZERO); safe.setRootCause(RootCause.UNKNOWN);
+            safe.setClassificationConfidence(java.math.BigDecimal.ONE); safe.setSignalsUsed(String.join("; ", normalizedEvent.getSignalsUsed()));
+            safe.setPolicyRuleMatched("Settled payment screening → No recovery required");
+            safe.setActionTaken(ActionTaken.VERIFY_STATUS); safe.setAttemptNumber(0); safe.setMaxAttemptsAllowed(0);
+            safe.setOutcome(Outcome.RECOVERED); safe.setRecoveredAmount(normalizedEvent.getAmount());
+            safe.setLifecycleState(LifecycleState.RECOVERED);
+            return auditRecordRepository.save(safe);
+        }
         ClassificationResult classification = classificationService.classify(normalizedEvent);
 
         RootCause effectiveRootCause = classification.getConfidence() < CONFIDENCE_THRESHOLD
@@ -93,7 +106,8 @@ public class RevenueRecoveryPipeline {
         // Phase 2 represented a failed pending-payment verification as NOT_RECOVERED.
         // Phase 3 permits only RECOVERED or ESCALATED after VERIFYING_PAYMENT.
         if (record.getActionTaken() == ActionTaken.VERIFY_STATUS
-                && record.getOutcome() == Outcome.NOT_RECOVERED) {
+                && record.getOutcome() == Outcome.NOT_RECOVERED
+                && (record.getAttemptNumber() == null || record.getAttemptNumber() > 0)) {
             record.setOutcome(Outcome.ESCALATED);
             record.setStopOrEscalateReason(
                     "Original payment status must be verified to avoid a duplicate debit");

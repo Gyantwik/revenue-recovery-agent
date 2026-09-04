@@ -49,11 +49,13 @@ export default async function TransactionDetailPage({ params }: { params: { even
           <Detail label="Currency" value={transaction.currency} />
           <Detail label="At risk" value={transaction.is_at_risk ? "Yes" : "No"} />
           <Detail label="Risk amount" value={formatCurrency(transaction.risk_amount, transaction.currency)} />
-          <Detail label="Root cause" value={<CauseBadge cause={transaction.root_cause} />} />
+          <Detail label={transaction.is_at_risk ? "Root cause" : "Settlement status"} value={transaction.is_at_risk
+            ? <CauseBadge cause={transaction.root_cause} />
+            : "Safely settled — no recovery required"} />
           <Detail label="Classification confidence" value={`${(transaction.classification_confidence * 100).toFixed(1)}%`} />
           <Detail label="Policy rule matched" value={transaction.policy_rule_matched} />
-          <Detail label="Action taken" value={ACTION_LABELS[transaction.action_taken]} />
-          <Detail label="Attempts / maximum" value={formatAttemptCount(transaction.attempt_number, transaction.max_attempts_allowed)} />
+          <Detail label="Action taken" value={transaction.is_at_risk ? ACTION_LABELS[transaction.action_taken] : "No recovery required"} />
+          <Detail label="Attempts / maximum" value={transaction.is_at_risk ? formatAttemptCount(transaction.attempt_number, transaction.max_attempts_allowed) : "N/A (no risk)"} />
           <Detail label="Outcome" value={transaction.outcome} />
           <Detail label="Lifecycle state" value={transaction.lifecycle_state.replaceAll("_", " ")} />
           <Detail label="Next eligible action" value={transaction.next_eligible_action_at ? formatDateTime(transaction.next_eligible_action_at) : "Not scheduled"} />

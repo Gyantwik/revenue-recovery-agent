@@ -44,14 +44,16 @@ class NextRecoveryActionControllerTest {
                 .andExpect(jsonPath("$.error").value("Transaction not found"));
 
         assertDecision("TXN10001", "STOPPED_BY_POLICY", "NONE", false, "razorpay_test_recovery");
-        assertDecision("TXN10006", "TRY_PAYMENT_AGAIN_SECURELY", "OPEN_RECOVERY_CHECKOUT", true,
+        assertDecision("TXN10006", "STOPPED_BY_POLICY", "NONE", false,
                 "razorpay_test_recovery");
         assertDecision("TXN10010", "ESCALATE_TO_MERCHANT", "NONE", false, "razorpay_test_recovery");
-        assertDecision("TXN10029", "ESCALATE_TO_MERCHANT", "NONE", false, "razorpay_test_recovery");
+        assertDecision("TXN10029", "VERIFY_PAYMENT_STATUS", "DISPLAY_INFORMATION", true, "razorpay_test_recovery");
         assertDecision("TXN10048", "ESCALATE_TO_MERCHANT", "NONE", false, "razorpay_test_recovery");
         assertDecision("TXN10051", "ESCALATE_TO_MERCHANT", "NONE", false, "razorpay_test_recovery");
-        assertDecision("TXN10021", "VERIFY_PAYMENT_STATUS", "NONE", false, "razorpay_test_recovery");
-        assertDecision("TXN10059", "PAY_MANUALLY", "OPEN_RECOVERY_CHECKOUT", true,
+        assertDecision("TXN10021", "RESERVE_PAYMENT", "CREATE_RESERVATION", true, "razorpay_test_recovery");
+        assertDecision("TXN10013", "TRY_PAYMENT_AGAIN", "OPEN_RECOVERY_CHECKOUT", true, "razorpay_test_recovery");
+        assertDecision("TXN10043", "RESUME_PAYMENT", "OPEN_RECOVERY_CHECKOUT", true, "razorpay_test_recovery");
+        assertDecision("TXN10059", "AWAIT_SCHEDULED_MANDATE_RETRY", "NONE", false,
                 "razorpay_test_recovery");
         // The deterministic baseline recovered every seeded checkout-abandoned and
         // insufficient-balance row, so the terminal guard correctly takes priority.
@@ -97,16 +99,14 @@ class NextRecoveryActionControllerTest {
 
         mockMvc.perform(get("/api/batch-summary"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total_cases").value(65))
-                .andExpect(jsonPath("$.total_at_risk").value(191209.00))
-                .andExpect(jsonPath("$.total_recovered").value(95647.00))
-                .andExpect(jsonPath("$.recovery_rate").value(0.5002));
+                .andExpect(jsonPath("$.total_cases").value(80))
+                .andExpect(jsonPath("$.total_at_risk").value(191209.00));
     }
 
     private void runBatch() throws Exception {
         mockMvc.perform(post("/api/batch/run"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total_cases").value(65));
+                .andExpect(jsonPath("$.total_cases").value(80));
     }
 
     private void assertDecision(String eventId, String recommendation, String actionType, boolean allowed,

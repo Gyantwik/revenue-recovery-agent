@@ -91,13 +91,15 @@ function harness(result: "valid" | "invalid" | "error" = "valid") {
   return { calls, createArguments, events, states, dependencies, getOptions: () => options }
 }
 
-test("page clearly separates the Test Mode recovery demo from the baseline", async () => {
+test("checkout page keeps recovery inside the transaction drawer", async () => {
   const recoveryPage = await readFile(new URL("../app/razorpay-test/page.tsx", import.meta.url), "utf8")
   const dashboard = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8")
-  assert.match(recoveryPage, /Live Test Mode Recovery Demo/)
+  const drawer = await readFile(new URL("../components/transactions/transaction-detail-dialog.tsx", import.meta.url), "utf8")
+  assert.doesNotMatch(recoveryPage, /Live Test Mode Recovery Demo/)
+  assert.doesNotMatch(recoveryPage, /TXN_DEMO_RECOVERY_001/)
+  assert.match(recoveryPage, /Payment Failure Simulator \(Razorpay Sandbox\)/)
   assert.match(recoveryPage, /No real money is charged/)
-  assert.match(recoveryPage, /Checkout Abandoned|failure_root_cause/)
-  assert.match(recoveryPage, /Send Recovery Link|policy_action/)
+  assert.match(drawer, /Next Recovery Decision/)
   assert.match(dashboard, /Synthetic Benchmark — 65 seeded cases/)
   assert.doesNotMatch(recoveryPage.toLowerCase(), /key_secret|razorpay_key_secret/)
   assert.doesNotMatch(recoveryPage, /razorpay_signature/)

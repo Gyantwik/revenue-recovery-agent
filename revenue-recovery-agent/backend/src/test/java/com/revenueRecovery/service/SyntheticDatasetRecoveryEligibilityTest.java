@@ -30,15 +30,15 @@ class SyntheticDatasetRecoveryEligibilityTest {
     @Autowired SyntheticDatasetSeeder seeder;
 
     @Test
-    void all65SeededEventsMatchTheDynamicEligibilityMatrix() {
+    void all80SeededEventsMatchTheDynamicEligibilityMatrix() {
         List<AuditRecord> records = auditRepository.findAll();
-        assertEquals(65, records.size());
+        assertEquals(80, records.size());
 
         for (AuditRecord record : records) {
             var decision = eligibilityService.evaluate(record);
             boolean expected = expectedAllowed(record);
             assertEquals(expected, decision.allowed(), record.getEventId());
-            assertEquals(expected ? NextActionType.OPEN_RECOVERY_CHECKOUT : NextActionType.NONE,
+            assertEquals(expected ? expectedActionType(record) : NextActionType.NONE,
                     decision.actionType(), record.getEventId());
             if (record.getOutcome() == Outcome.RECOVERED) {
                 assertEquals("Already Recovered", decision.buttonLabel(), record.getEventId());
@@ -58,8 +58,8 @@ class SyntheticDatasetRecoveryEligibilityTest {
         seeder.run(null);
         seeder.run(null);
 
-        assertEquals(65, auditRepository.count());
-        assertEquals(65, eventRepository.count());
+        assertEquals(80, auditRepository.count());
+        assertEquals(80, eventRepository.count());
         AuditRecord retained = auditRepository.findByEventId("TXN10044").orElseThrow();
         assertEquals(Outcome.RECOVERED, retained.getOutcome());
         assertEquals(0, retained.getAmount().compareTo(retained.getRecoveredAmount()));
@@ -71,12 +71,20 @@ class SyntheticDatasetRecoveryEligibilityTest {
         }
         RootCause cause = record.getRootCause();
         return switch (cause) {
-            case CHECKOUT_ABANDONED, INSUFFICIENT_BALANCE, INCORRECT_PIN, MANDATE_EXPIRED -> true;
-            case BANK_TEMP_ERROR, MANDATE_FAILED_RETRYABLE ->
+            case CHECKOUT_ABANDONED, MANDATE_EXPIRED, PAYMENT_PENDING -> true;
+            case BANK_TEMP_ERROR -> record.getAttemptNumber() != null
+                    && record.getAttemptNumber() < record.getMaxAttemptsAllowed()
+                    && record.getLifecycleState() != com.revenueRecovery.model.enums.LifecycleState.RETRY_SCHEDULED;
+            case MANDATE_FAILED_RETRYABLE ->
                     record.getMaxAttemptsAllowed() != null && record.getMaxAttemptsAllowed() > 0
                             && record.getAttemptNumber() != null
                             && record.getAttemptNumber() >= record.getMaxAttemptsAllowed();
             default -> false;
         };
+    }
+
+    private NextActionType expectedActionType(AuditRecord record) {
+        return record.getRootCause() == RootCause.PAYMENT_PENDING
+                ? NextActionType.DISPLAY_INFORMATION : NextActionType.OPEN_RECOVERY_CHECKOUT;
     }
 }

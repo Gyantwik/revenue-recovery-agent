@@ -42,8 +42,8 @@ test("formats INR using the en-IN currency contract", () => {
   assert.equal(formatCurrency(191209), "₹1,91,209")
 })
 
-test("formats stopped and escalated attempts as 0/0", () => {
-  assert.equal(formatAttemptCount(0, 0), "0/0")
+test("formats stopped and escalated attempts as a policy N/A", () => {
+  assert.equal(formatAttemptCount(0, 0), "N/A (Policy)")
 })
 
 test("rejects retry attempt counts above the maximum", () => {

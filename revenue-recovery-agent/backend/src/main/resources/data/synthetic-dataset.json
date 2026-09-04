@@ -19,7 +19,7 @@
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "User explicitly cancelled \u2014 policy forbids retry"
+    "stop_or_escalate_reason": "User explicitly cancelled — policy forbids retry"
   },
   {
     "event_id": "TXN10002",
@@ -41,7 +41,7 @@
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "User explicitly cancelled \u2014 policy forbids retry"
+    "stop_or_escalate_reason": "User explicitly cancelled — policy forbids retry"
   },
   {
     "event_id": "TXN10003",
@@ -63,7 +63,7 @@
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "User explicitly cancelled \u2014 policy forbids retry"
+    "stop_or_escalate_reason": "User explicitly cancelled — policy forbids retry"
   },
   {
     "event_id": "TXN10004",
@@ -85,7 +85,7 @@
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "User explicitly cancelled \u2014 policy forbids retry"
+    "stop_or_escalate_reason": "User explicitly cancelled — policy forbids retry"
   },
   {
     "event_id": "TXN10005",
@@ -107,7 +107,7 @@
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "User explicitly cancelled \u2014 policy forbids retry"
+    "stop_or_escalate_reason": "User explicitly cancelled — policy forbids retry"
   },
   {
     "event_id": "TXN10006",
@@ -125,11 +125,11 @@
     ],
     "policy_rule_matched": "Auth failure (PIN) -> Stop",
     "action_taken": "no_action_stop",
-    "attempt_number": 1,
+    "attempt_number": 0,
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Incorrect PIN \u2014 authentication failure, requires manual customer retry"
+    "stop_or_escalate_reason": "Authentication failure — customer must initiate a fresh payment"
   },
   {
     "event_id": "TXN10007",
@@ -147,11 +147,11 @@
     ],
     "policy_rule_matched": "Auth failure (PIN) -> Stop",
     "action_taken": "no_action_stop",
-    "attempt_number": 1,
+    "attempt_number": 0,
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Incorrect PIN \u2014 authentication failure, requires manual customer retry"
+    "stop_or_escalate_reason": "Authentication failure — customer must initiate a fresh payment"
   },
   {
     "event_id": "TXN10008",
@@ -169,11 +169,11 @@
     ],
     "policy_rule_matched": "Auth failure (PIN) -> Stop",
     "action_taken": "no_action_stop",
-    "attempt_number": 1,
+    "attempt_number": 0,
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Incorrect PIN \u2014 authentication failure, requires manual customer retry"
+    "stop_or_escalate_reason": "Authentication failure — customer must initiate a fresh payment"
   },
   {
     "event_id": "TXN10009",
@@ -191,11 +191,11 @@
     ],
     "policy_rule_matched": "Auth failure (PIN) -> Stop",
     "action_taken": "no_action_stop",
-    "attempt_number": 1,
+    "attempt_number": 0,
     "max_attempts_allowed": 0,
     "outcome": "stopped_correctly",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Incorrect PIN \u2014 authentication failure, requires manual customer retry"
+    "stop_or_escalate_reason": "Authentication failure — customer must initiate a fresh payment"
   },
   {
     "event_id": "TXN10010",
@@ -217,7 +217,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Low classification confidence \u2014 routed to manual review"
+    "stop_or_escalate_reason": "Low classification confidence — routed to manual review"
   },
   {
     "event_id": "TXN10011",
@@ -239,7 +239,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Low classification confidence \u2014 routed to manual review"
+    "stop_or_escalate_reason": "Low classification confidence — routed to manual review"
   },
   {
     "event_id": "TXN10012",
@@ -261,7 +261,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Low classification confidence \u2014 routed to manual review"
+    "stop_or_escalate_reason": "Low classification confidence — routed to manual review"
   },
   {
     "event_id": "TXN10013",
@@ -277,12 +277,12 @@
       "gateway_response_code: BANK_TIMEOUT",
       "issuer: ICICI"
     ],
-    "policy_rule_matched": "Bank temp error \u2192 Retry, max 2, 30 min window",
+    "policy_rule_matched": "Bank temp error → Retry, max 2, 30 min window",
     "action_taken": "retry_payment",
-    "attempt_number": 1,
+    "attempt_number": 0,
     "max_attempts_allowed": 2,
-    "outcome": "recovered",
-    "recovered_amount": 3100,
+    "outcome": "not_recovered",
+    "recovered_amount": 0,
     "stop_or_escalate_reason": null
   },
   {
@@ -299,7 +299,7 @@
       "gateway_response_code: CBS_OFFLINE",
       "bank_downtime_api: TRUE"
     ],
-    "policy_rule_matched": "Bank temp error \u2192 Retry, max 2, 30 min window",
+    "policy_rule_matched": "Bank temp error → Retry, max 2, 30 min window",
     "action_taken": "retry_payment",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -321,7 +321,7 @@
       "gateway_response_code: ISSUER_NODE_DOWN",
       "attempt_history: 1 prior attempt"
     ],
-    "policy_rule_matched": "Bank temp error \u2192 Retry, max 2, 30 min window",
+    "policy_rule_matched": "Bank temp error → Retry, max 2, 30 min window",
     "action_taken": "retry_payment",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -343,7 +343,7 @@
       "gateway_response_code: BANK_TIMEOUT",
       "npci_status: DEGRADED"
     ],
-    "policy_rule_matched": "Bank temp error \u2192 Retry, max 2, 30 min window",
+    "policy_rule_matched": "Bank temp error → Retry, max 2, 30 min window",
     "action_taken": "retry_payment",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -365,7 +365,7 @@
       "gateway_response_code: 91_ISSUER_UNAVAILABLE",
       "issuer_bank: AXIS"
     ],
-    "policy_rule_matched": "Bank temp error \u2192 Retry, max 2, 30 min window",
+    "policy_rule_matched": "Bank temp error → Retry, max 2, 30 min window",
     "action_taken": "retry_payment",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -387,7 +387,7 @@
       "gateway_response_code: BANK_TIMEOUT",
       "provider: JUSPAY"
     ],
-    "policy_rule_matched": "Bank temp error \u2192 Retry, max 2, 30 min window",
+    "policy_rule_matched": "Bank temp error → Retry, max 2, 30 min window",
     "action_taken": "retry_payment",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -409,7 +409,7 @@
       "gateway_response_code: CBS_OFFLINE",
       "attempt_history: 1 prior attempt"
     ],
-    "policy_rule_matched": "Bank temp error \u2192 Retry, max 2, 30 min window",
+    "policy_rule_matched": "Bank temp error → Retry, max 2, 30 min window",
     "action_taken": "retry_payment",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -431,7 +431,7 @@
       "gateway_response_code: BANK_TIMEOUT",
       "issuer_bank: KOTAK"
     ],
-    "policy_rule_matched": "Bank temp error \u2192 Retry, max 2, 30 min window",
+    "policy_rule_matched": "Bank temp error → Retry, max 2, 30 min window",
     "action_taken": "retry_payment",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -453,12 +453,12 @@
       "client_signal: HIGH_LATENCY",
       "gateway_response_code: CLIENT_TIMEOUT"
     ],
-    "policy_rule_matched": "Weak network \u2192 Retry, max 2",
+    "policy_rule_matched": "Weak network → Retry, max 2",
     "action_taken": "retry_payment",
-    "attempt_number": 1,
+    "attempt_number": 0,
     "max_attempts_allowed": 2,
-    "outcome": "recovered",
-    "recovered_amount": 500,
+    "outcome": "not_recovered",
+    "recovered_amount": 0,
     "stop_or_escalate_reason": null
   },
   {
@@ -475,7 +475,7 @@
       "client_signal: NETWORK_DROP",
       "provider: RAZORPAY"
     ],
-    "policy_rule_matched": "Weak network \u2192 Retry, max 2",
+    "policy_rule_matched": "Weak network → Retry, max 2",
     "action_taken": "retry_payment",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -497,7 +497,7 @@
       "client_signal: JITTER_DETECTED",
       "gateway_response_code: NO_RESPONSE"
     ],
-    "policy_rule_matched": "Weak network \u2192 Retry, max 2",
+    "policy_rule_matched": "Weak network → Retry, max 2",
     "action_taken": "retry_payment",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -519,7 +519,7 @@
       "client_signal: 3G_FALLBACK",
       "latency_ms: 18000"
     ],
-    "policy_rule_matched": "Weak network \u2192 Retry, max 2",
+    "policy_rule_matched": "Weak network → Retry, max 2",
     "action_taken": "retry_payment",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -541,7 +541,7 @@
       "client_signal: CONNECTION_RESET",
       "gateway_response_code: CLIENT_TIMEOUT"
     ],
-    "policy_rule_matched": "Weak network \u2192 Retry, max 2",
+    "policy_rule_matched": "Weak network → Retry, max 2",
     "action_taken": "retry_payment",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -563,7 +563,7 @@
       "client_signal: PACKET_LOSS_HIGH",
       "auth_type: OTP"
     ],
-    "policy_rule_matched": "Weak network \u2192 Retry, max 2",
+    "policy_rule_matched": "Weak network → Retry, max 2",
     "action_taken": "retry_payment",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -585,7 +585,7 @@
       "client_signal: NETWORK_DROP",
       "attempt_history: 1 prior attempt"
     ],
-    "policy_rule_matched": "Weak network \u2192 Retry, max 2",
+    "policy_rule_matched": "Weak network → Retry, max 2",
     "action_taken": "retry_payment",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -607,7 +607,7 @@
       "client_signal: HIGH_LATENCY",
       "gateway_response_code: TIMEOUT"
     ],
-    "policy_rule_matched": "Weak network \u2192 Retry, max 2",
+    "policy_rule_matched": "Weak network → Retry, max 2",
     "action_taken": "retry_payment",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -629,12 +629,12 @@
       "gateway_response_code: PENDING_WITH_BANK",
       "npci_status: IN_PROCESS"
     ],
-    "policy_rule_matched": "Payment pending \u2192 Verify status only",
+    "policy_rule_matched": "Payment pending → Verify status only",
     "action_taken": "verify_status",
-    "attempt_number": 1,
+    "attempt_number": 0,
     "max_attempts_allowed": 1,
-    "outcome": "recovered",
-    "recovered_amount": 5400,
+    "outcome": "not_recovered",
+    "recovered_amount": 0,
     "stop_or_escalate_reason": null
   },
   {
@@ -651,7 +651,7 @@
       "gateway_response_code: STATUS_UNKNOWN",
       "provider: CASHFREE"
     ],
-    "policy_rule_matched": "Payment pending \u2192 Verify status only",
+    "policy_rule_matched": "Payment pending → Verify status only",
     "action_taken": "verify_status",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -673,7 +673,7 @@
       "gateway_response_code: PENDING_WITH_BANK",
       "polling_attempts: 3"
     ],
-    "policy_rule_matched": "Payment pending \u2192 Verify status only",
+    "policy_rule_matched": "Payment pending → Verify status only",
     "action_taken": "verify_status",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -695,7 +695,7 @@
       "gateway_response_code: 68_AWAITING_RESPONSE",
       "issuer_bank: SBI"
     ],
-    "policy_rule_matched": "Payment pending \u2192 Verify status only",
+    "policy_rule_matched": "Payment pending → Verify status only",
     "action_taken": "verify_status",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -717,7 +717,7 @@
       "gateway_response_code: PENDING_WITH_BANK",
       "latency_ms: 22000"
     ],
-    "policy_rule_matched": "Payment pending \u2192 Verify status only",
+    "policy_rule_matched": "Payment pending → Verify status only",
     "action_taken": "verify_status",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -739,7 +739,7 @@
       "gateway_response_code: STATUS_UNKNOWN",
       "provider: STRIPE"
     ],
-    "policy_rule_matched": "Payment pending \u2192 Verify status only",
+    "policy_rule_matched": "Payment pending → Verify status only",
     "action_taken": "verify_status",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -761,7 +761,7 @@
       "gateway_response_code: PENDING_WITH_BANK",
       "auth_type: NET_BANKING"
     ],
-    "policy_rule_matched": "Payment pending \u2192 Verify status only",
+    "policy_rule_matched": "Payment pending → Verify status only",
     "action_taken": "verify_status",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -783,7 +783,7 @@
       "gateway_response_code: 51_INSUFFICIENT_FUNDS",
       "issuer_bank: HDFC"
     ],
-    "policy_rule_matched": "Insufficient balance \u2192 Send alternative payment link",
+    "policy_rule_matched": "Insufficient balance → Send alternative payment link",
     "action_taken": "send_alt_payment_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -805,7 +805,7 @@
       "gateway_response_code: INSUFFICIENT_FUNDS",
       "auth_type: DEBIT_CARD"
     ],
-    "policy_rule_matched": "Insufficient balance \u2192 Send alternative payment link",
+    "policy_rule_matched": "Insufficient balance → Send alternative payment link",
     "action_taken": "send_alt_payment_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -827,7 +827,7 @@
       "gateway_response_code: 51_INSUFFICIENT_FUNDS",
       "provider: PAYU"
     ],
-    "policy_rule_matched": "Insufficient balance \u2192 Send alternative payment link",
+    "policy_rule_matched": "Insufficient balance → Send alternative payment link",
     "action_taken": "send_alt_payment_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -849,7 +849,7 @@
       "gateway_response_code: INSUFFICIENT_FUNDS",
       "issuer_bank: ICICI"
     ],
-    "policy_rule_matched": "Insufficient balance \u2192 Send alternative payment link",
+    "policy_rule_matched": "Insufficient balance → Send alternative payment link",
     "action_taken": "send_alt_payment_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -871,7 +871,7 @@
       "gateway_response_code: 51_INSUFFICIENT_FUNDS",
       "auth_type: UPI"
     ],
-    "policy_rule_matched": "Insufficient balance \u2192 Send alternative payment link",
+    "policy_rule_matched": "Insufficient balance → Send alternative payment link",
     "action_taken": "send_alt_payment_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -893,7 +893,7 @@
       "gateway_response_code: INSUFFICIENT_BALANCE",
       "provider: RAZORPAY"
     ],
-    "policy_rule_matched": "Insufficient balance \u2192 Send alternative payment link",
+    "policy_rule_matched": "Insufficient balance → Send alternative payment link",
     "action_taken": "send_alt_payment_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -915,7 +915,7 @@
       "gateway_response_code: 51_INSUFFICIENT_FUNDS",
       "issuer_bank: AXIS"
     ],
-    "policy_rule_matched": "Insufficient balance \u2192 Send alternative payment link",
+    "policy_rule_matched": "Insufficient balance → Send alternative payment link",
     "action_taken": "send_alt_payment_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -937,12 +937,12 @@
       "ui_event: APP_BACKGROUNDED",
       "time_on_page: 300s"
     ],
-    "policy_rule_matched": "Checkout abandoned \u2192 Send recovery link",
+    "policy_rule_matched": "Checkout abandoned → Send recovery link",
     "action_taken": "send_recovery_link",
-    "attempt_number": 1,
+    "attempt_number": 0,
     "max_attempts_allowed": 1,
-    "outcome": "recovered",
-    "recovered_amount": 3150,
+    "outcome": "not_recovered",
+    "recovered_amount": 0,
     "stop_or_escalate_reason": null
   },
   {
@@ -959,7 +959,7 @@
       "ui_event: SESSION_EXPIRED",
       "interaction_count: 0"
     ],
-    "policy_rule_matched": "Checkout abandoned \u2192 Send recovery link",
+    "policy_rule_matched": "Checkout abandoned → Send recovery link",
     "action_taken": "send_recovery_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -981,7 +981,7 @@
       "ui_event: TAB_CLOSED",
       "time_on_page: 120s"
     ],
-    "policy_rule_matched": "Checkout abandoned \u2192 Send recovery link",
+    "policy_rule_matched": "Checkout abandoned → Send recovery link",
     "action_taken": "send_recovery_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -1003,7 +1003,7 @@
       "ui_event: APP_BACKGROUNDED",
       "cart_value: 2800"
     ],
-    "policy_rule_matched": "Checkout abandoned \u2192 Send recovery link",
+    "policy_rule_matched": "Checkout abandoned → Send recovery link",
     "action_taken": "send_recovery_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -1025,7 +1025,7 @@
       "ui_event: INACTIVITY_TIMEOUT",
       "time_on_page: 600s"
     ],
-    "policy_rule_matched": "Checkout abandoned \u2192 Send recovery link",
+    "policy_rule_matched": "Checkout abandoned → Send recovery link",
     "action_taken": "send_recovery_link",
     "attempt_number": 1,
     "max_attempts_allowed": 1,
@@ -1053,7 +1053,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Merchant/gateway-side issue \u2014 requires manual review"
+    "stop_or_escalate_reason": "Merchant/gateway-side issue — requires manual review"
   },
   {
     "event_id": "TXN10049",
@@ -1075,7 +1075,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Merchant/gateway-side issue \u2014 requires manual review"
+    "stop_or_escalate_reason": "Merchant/gateway-side issue — requires manual review"
   },
   {
     "event_id": "TXN10050",
@@ -1097,7 +1097,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Merchant/gateway-side issue \u2014 requires manual review"
+    "stop_or_escalate_reason": "Merchant/gateway-side issue — requires manual review"
   },
   {
     "event_id": "TXN10051",
@@ -1119,7 +1119,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Mandate expired or revoked \u2014 cannot retry, new mandate required"
+    "stop_or_escalate_reason": "Mandate expired or revoked — cannot retry, new mandate required"
   },
   {
     "event_id": "TXN10052",
@@ -1141,7 +1141,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Mandate expired or revoked \u2014 cannot retry, new mandate required"
+    "stop_or_escalate_reason": "Mandate expired or revoked — cannot retry, new mandate required"
   },
   {
     "event_id": "TXN10053",
@@ -1163,7 +1163,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Mandate expired or revoked \u2014 cannot retry, new mandate required"
+    "stop_or_escalate_reason": "Mandate expired or revoked — cannot retry, new mandate required"
   },
   {
     "event_id": "TXN10054",
@@ -1185,7 +1185,7 @@
     "max_attempts_allowed": 0,
     "outcome": "escalated",
     "recovered_amount": 0,
-    "stop_or_escalate_reason": "Low classification confidence \u2014 routed to manual review"
+    "stop_or_escalate_reason": "Low classification confidence — routed to manual review"
   },
   {
     "event_id": "TXN10055",
@@ -1201,7 +1201,7 @@
       "gateway_response_code: DECLINED_BY_BANK",
       "mandate_status: ACTIVE"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -1223,7 +1223,7 @@
       "gateway_response_code: TEMPORARY_BLOCK",
       "attempt_history: 1 prior attempt"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -1245,7 +1245,7 @@
       "gateway_response_code: ISSUER_NODE_OFFLINE",
       "mandate_status: ACTIVE"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -1267,7 +1267,7 @@
       "gateway_response_code: SERVER_BUSY",
       "attempt_history: 1 prior attempt"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -1289,7 +1289,7 @@
       "gateway_response_code: PROCESSING_ERROR",
       "mandate_status: ACTIVE"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -1311,7 +1311,7 @@
       "gateway_response_code: TIMEOUT",
       "attempt_history: 1 prior attempt"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -1333,7 +1333,7 @@
       "gateway_response_code: SUSPECTED_FRAUD_TEMP",
       "mandate_status: ACTIVE"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -1355,7 +1355,7 @@
       "gateway_response_code: SYSTEM_ERROR",
       "attempt_history: 1 prior attempt"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -1377,7 +1377,7 @@
       "gateway_response_code: BANK_INTERNAL_ERROR",
       "mandate_status: ACTIVE"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
@@ -1399,7 +1399,7 @@
       "gateway_response_code: NO_RESPONSE",
       "attempt_history: 1 prior attempt"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 2,
     "max_attempts_allowed": 2,
@@ -1421,12 +1421,27 @@
       "gateway_response_code: CONNECTION_TIMEOUT",
       "mandate_status: ACTIVE"
     ],
-    "policy_rule_matched": "Mandate failed retryable \u2192 Retry, max 2",
+    "policy_rule_matched": "Mandate failed retryable → Retry, max 2",
     "action_taken": "schedule_mandate_retry",
     "attempt_number": 1,
     "max_attempts_allowed": 2,
     "outcome": "not_recovered",
     "recovered_amount": 0,
     "stop_or_escalate_reason": null
-  }
+  },
+  {"event_id":"TXN10066","case_type":"payment_degradation","amount":500,"currency":"INR","timestamp":"2026-08-15T09:00:00Z","signals_used":["PAYMENT_SETTLED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":500},
+  {"event_id":"TXN10067","case_type":"payment_degradation","amount":750,"currency":"INR","timestamp":"2026-08-15T09:01:00Z","signals_used":["SUCCESS_CONFIRMED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":750},
+  {"event_id":"TXN10068","case_type":"payment_degradation","amount":1000,"currency":"INR","timestamp":"2026-08-15T09:02:00Z","signals_used":["DUPLICATE_WEBHOOK"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":1000},
+  {"event_id":"TXN10069","case_type":"payment_degradation","amount":1250,"currency":"INR","timestamp":"2026-08-15T09:03:00Z","signals_used":["PAYMENT_SETTLED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":1250},
+  {"event_id":"TXN10070","case_type":"payment_degradation","amount":1500,"currency":"INR","timestamp":"2026-08-15T09:04:00Z","signals_used":["SUCCESS_CONFIRMED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":1500},
+  {"event_id":"TXN10071","case_type":"payment_degradation","amount":1750,"currency":"INR","timestamp":"2026-08-15T09:05:00Z","signals_used":["DUPLICATE_WEBHOOK"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":1750},
+  {"event_id":"TXN10072","case_type":"payment_degradation","amount":2000,"currency":"INR","timestamp":"2026-08-15T09:06:00Z","signals_used":["PAYMENT_SETTLED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":2000},
+  {"event_id":"TXN10073","case_type":"payment_degradation","amount":2250,"currency":"INR","timestamp":"2026-08-15T09:07:00Z","signals_used":["SUCCESS_CONFIRMED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":2250},
+  {"event_id":"TXN10074","case_type":"payment_degradation","amount":2500,"currency":"INR","timestamp":"2026-08-15T09:08:00Z","signals_used":["DUPLICATE_WEBHOOK"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":2500},
+  {"event_id":"TXN10075","case_type":"payment_degradation","amount":2750,"currency":"INR","timestamp":"2026-08-15T09:09:00Z","signals_used":["PAYMENT_SETTLED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":2750},
+  {"event_id":"TXN10076","case_type":"payment_degradation","amount":3000,"currency":"INR","timestamp":"2026-08-15T09:10:00Z","signals_used":["SUCCESS_CONFIRMED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":3000},
+  {"event_id":"TXN10077","case_type":"payment_degradation","amount":3250,"currency":"INR","timestamp":"2026-08-15T09:11:00Z","signals_used":["DUPLICATE_WEBHOOK"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":3250},
+  {"event_id":"TXN10078","case_type":"payment_degradation","amount":3500,"currency":"INR","timestamp":"2026-08-15T09:12:00Z","signals_used":["PAYMENT_SETTLED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":3500},
+  {"event_id":"TXN10079","case_type":"payment_degradation","amount":3750,"currency":"INR","timestamp":"2026-08-15T09:13:00Z","signals_used":["SUCCESS_CONFIRMED"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":3750},
+  {"event_id":"TXN10080","case_type":"payment_degradation","amount":4000,"currency":"INR","timestamp":"2026-08-15T09:14:00Z","signals_used":["DUPLICATE_WEBHOOK"],"root_cause":"unknown","attempt_number":0,"max_attempts_allowed":0,"outcome":"recovered","recovered_amount":4000}
 ]

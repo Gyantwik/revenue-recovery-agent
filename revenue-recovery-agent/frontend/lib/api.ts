@@ -14,6 +14,12 @@ import type {
   Transaction,
   TransactionRecoveryOrder,
   TransactionRecoveryStatus,
+  AgentDecisionTrace,
+  AiAnalysisResponse,
+  AiMessageChannel,
+  AiMessageResponse,
+  ExplainabilityResponse,
+  PolicyImpactResponse,
 } from "@/lib/types"
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080")
@@ -103,6 +109,10 @@ function isTransaction(value: unknown): value is Transaction {
     && (item.next_eligible_action_at == null || typeof item.next_eligible_action_at === "string")
     && (item.recovery_window_expires_at == null || typeof item.recovery_window_expires_at === "string")
     && Array.isArray(item.history)
+    && typeof item.customer_ref === "string"
+    && ["live", "seeded_reference"].includes(item.source ?? "")
+    && (item.verification_result == null || typeof item.verification_result === "string")
+    && typeof item.detail === "string"
 }
 
 function isBatchSummary(value: unknown): value is BatchSummary {
@@ -154,6 +164,105 @@ export async function getTransaction(eventId: string): Promise<Transaction> {
   return body
 }
 
+export async function getAgentTrace(eventId: string): Promise<AgentDecisionTrace[]> {
+  const body = await requestJson(`/api/transactions/${encodeURIComponent(eventId)}/agent-trace`)
+  if (!Array.isArray(body) || !body.every(item => typeof item === "object" && item !== null
+    && typeof item.event_id === "string" && typeof item.stage === "string"
+    && typeof item.summary === "string" && typeof item.detail === "string"
+    && typeof item.actor === "string" && typeof item.timestamp === "string")) {
+    throw new ApiError("Backend returned an invalid agent trace")
+  }
+  return body as AgentDecisionTrace[]
+}
+
+const AI_TRACE_STAGES = ["OBSERVE", "CLASSIFY", "DECIDE", "GUARDRAIL_CHECK", "ACT"] as const
+
+export async function getAiAnalysis(eventId: string): Promise<AiAnalysisResponse> {
+  const body = await requestJson(`/api/transactions/${encodeURIComponent(eventId)}/ai-analysis`)
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid Gemini AI analysis")
+  }
+  const analysis = body as Partial<AiAnalysisResponse>
+  const trace = analysis.reasoning_trace
+  if (analysis.event_id !== eventId
+    || typeof analysis.predicted_root_cause !== "string"
+    || !isFiniteNumber(analysis.confidence) || analysis.confidence < 0 || analysis.confidence > 1
+    || typeof analysis.recommended_action !== "string"
+    || typeof analysis.ai_explanation !== "string"
+    || typeof analysis.optimal_retry_timing !== "string"
+    || typeof analysis.risk_assessment !== "string"
+    || !["gemini", "rules_based"].includes(analysis.analysis_source ?? "")
+    || !Array.isArray(trace) || trace.length !== AI_TRACE_STAGES.length
+    || !trace.every((step, index) => typeof step === "object" && step !== null
+      && step.stage === AI_TRACE_STAGES[index]
+      && typeof step.thought === "string" && typeof step.conclusion === "string")) {
+    throw new ApiError("Backend returned an invalid Gemini AI analysis")
+  }
+  return analysis as AiAnalysisResponse
+}
+
+export async function generateAiRecoveryMessage(
+  eventId: string,
+  channel: AiMessageChannel,
+  customerName: string,
+): Promise<AiMessageResponse> {
+  const body = await requestJson(`/api/transactions/${encodeURIComponent(eventId)}/ai-message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ channel, customerName }),
+  })
+  if (typeof body !== "object" || body === null) {
+    throw new ApiError("Backend returned an invalid Gemini recovery message")
+  }
+  const message = body as Partial<AiMessageResponse>
+  if (message.event_id !== eventId || typeof message.channel !== "string"
+    || typeof message.subject !== "string" || typeof message.message !== "string"
+    || typeof message.suggested_cta !== "string") {
+    throw new ApiError("Backend returned an invalid Gemini recovery message")
+  }
+  return message as AiMessageResponse
+}
+
+export async function measureBackendLatency(): Promise<number> {
+  const started = performance.now()
+  await requestJson("/api/ping")
+  return Math.round(performance.now() - started)
+}
+
+export async function createPaymentReservation(eventId: string): Promise<void> {
+  await requestJson(`/api/transactions/${encodeURIComponent(eventId)}/reservation`, { method: "POST" })
+}
+
+export async function simulateReservationReconnect(eventId: string): Promise<void> {
+  await requestJson(`/api/transactions/${encodeURIComponent(eventId)}/reservation/reconnect`, { method: "POST" })
+}
+
+export async function getExplainability(eventId: string): Promise<ExplainabilityResponse> {
+  const body = await requestJson(`/api/transactions/${encodeURIComponent(eventId)}/explainability`)
+  if (typeof body !== "object" || body === null) throw new ApiError("Backend returned an invalid explainability response")
+  const result = body as Partial<ExplainabilityResponse>
+  if (result.event_id !== eventId || !Array.isArray(result.signals_used) || typeof result.root_cause !== "string"
+    || !isFiniteNumber(result.classification_confidence) || typeof result.policy_rule_matched !== "string"
+    || typeof result.allowed_action !== "string" || !isFiniteNumber(result.attempt_number)
+    || !isFiniteNumber(result.max_attempts_allowed) || typeof result.was_blocked !== "boolean") {
+    throw new ApiError("Backend returned an invalid explainability response")
+  }
+  return result as ExplainabilityResponse
+}
+
+export async function getPolicyImpact(): Promise<PolicyImpactResponse> {
+  const body = await requestJson("/api/simulator/policy-impact")
+  if (typeof body !== "object" || body === null) throw new ApiError("Backend returned an invalid policy impact response")
+  const result = body as Partial<PolicyImpactResponse>
+  if (!isFiniteNumber(result.eligible_cases) || !isFiniteNumber(result.recoverable_amount)
+    || !isFiniteNumber(result.expected_recovery_rate) || !isFiniteNumber(result.cases_blocked_for_safety)
+    || !isFiniteNumber(result.blocked_amount) || !isFiniteNumber(result.at_risk_cases)
+    || !isFiniteNumber(result.not_at_risk_cases) || !isFiniteNumber(result.total_cases_considered)) {
+    throw new ApiError("Backend returned an invalid policy impact response")
+  }
+  return result as PolicyImpactResponse
+}
+
 export async function getNextRecoveryAction(eventId: string): Promise<NextRecoveryActionDecision> {
   const body = await requestJson(`/api/transactions/${encodeURIComponent(eventId)}/next-action`)
   if (typeof body !== "object" || body === null) {
@@ -166,10 +275,11 @@ export async function getNextRecoveryAction(eventId: string): Promise<NextRecove
     "AWAIT_SCHEDULED_MANDATE_RETRY", "ESCALATE_AFTER_RETRY_EXHAUSTED",
     "CUSTOMER_RECOVERY_CHECKOUT", "RESUME_PAYMENT", "CHOOSE_ANOTHER_PAYMENT_METHOD",
     "TRY_PAYMENT_AGAIN_SECURELY", "TRY_PAYMENT_AGAIN", "PAY_MANUALLY",
-    "SEND_RECOVERY_LINK", "SEND_ALT_PAYMENT_LINK",
+    "SEND_RECOVERY_LINK", "SEND_ALT_PAYMENT_LINK", "RESERVE_PAYMENT", "COMPLETE_RESERVATION",
   ]
   const actionTypes = ["NONE", "DISPLAY_INFORMATION", "OPEN_RECOVERY_CHECKOUT",
-    "RESUME_RECOVERY_CHECKOUT", "CHECK_PAYMENT_STATUS", "OPEN_TEST_MODE_RECOVERY_CHECKOUT"]
+    "RESUME_RECOVERY_CHECKOUT", "CHECK_PAYMENT_STATUS", "OPEN_TEST_MODE_RECOVERY_CHECKOUT",
+    "CREATE_RESERVATION", "SIMULATE_RECONNECT"]
   if (decision.event_id !== eventId
     || typeof decision.current_outcome !== "string"
     || typeof decision.outcome !== "string"

@@ -30,7 +30,11 @@ export interface RazorpayCheckoutOptions {
 
 export interface RazorpayCheckoutInstance {
   open(): void
-  on(event: "payment.failed", handler: () => void): void
+  on(event: "payment.failed", handler: (response: RazorpayFailureResponse) => void): void
+}
+
+export interface RazorpayFailureResponse {
+  error?: { reason?: string; code?: string; description?: string; source?: string; step?: string }
 }
 
 export type RazorpayConstructor = new (options: RazorpayCheckoutOptions) => RazorpayCheckoutInstance
@@ -85,6 +89,9 @@ export interface CheckoutFlowDependencies {
   loadScript(): Promise<void>
   createCheckout(options: RazorpayCheckoutOptions): RazorpayCheckoutInstance
   onState(state: CheckoutDisplayState): void
+  measureLatency?: () => Promise<number>
+  simulatedConnection?: boolean
+  failureReason?: string
 }
 
 export interface CheckoutDisplayState {
@@ -97,13 +104,14 @@ export interface CheckoutDisplayState {
 }
 
 export async function startCheckoutFlow(amount: number, dependencies: CheckoutFlowDependencies): Promise<void> {
+  const latencyMs = dependencies.measureLatency ? await dependencies.measureLatency() : 0
   const order = await dependencies.createOrder(amount)
   dependencies.onState({ message: "Test order created.", status: "order_created", order })
   const config = await dependencies.getConfig()
   await dependencies.loadScript()
 
   let reported = false
-  const reportDismissal = async () => {
+  const reportDismissal = async (failure?: RazorpayFailureResponse) => {
     if (reported) return
     reported = true
     try {
@@ -111,7 +119,14 @@ export async function startCheckoutFlow(amount: number, dependencies: CheckoutFl
         internal_request_id: order.internal_request_id,
         razorpay_order_id: order.razorpay_order_id,
         event_type: "checkout_failed_or_dismissed",
-        reason: "user_cancelled_or_test_failure",
+        reason: failure ? dependencies.failureReason ?? failure.error?.reason ?? "payment_cancelled" : "payment_cancelled",
+        customer_ref: "test.customer@example.invalid",
+        error_code: failure?.error?.code,
+        error_description: failure?.error?.description,
+        error_source: failure?.error?.source,
+        error_step: failure?.error?.step,
+        latency_ms: latencyMs,
+        simulated_connection: dependencies.simulatedConnection ?? false,
       })
       dependencies.onState({
         message: "Checkout was dismissed or failed. No payment was verified.",
@@ -153,6 +168,9 @@ export async function startCheckoutFlow(amount: number, dependencies: CheckoutFl
       void dependencies.recordEvent({
         ...verificationRequest,
         event_type: "checkout_success",
+        customer_ref: "test.customer@example.invalid",
+        latency_ms: latencyMs,
+        simulated_connection: dependencies.simulatedConnection ?? false,
       }).then(async event => {
         dependencies.onState({
           message: "Checkout reported success. Server verification is pending.",
@@ -163,7 +181,7 @@ export async function startCheckoutFlow(amount: number, dependencies: CheckoutFl
         try {
           const verification = await dependencies.verifyPayment(verificationRequest)
           dependencies.onState({
-            message: "Razorpay Test Mode payment signature verified. This verifies checkout authenticity only; it does not update a recovery case in Phase 4C.",
+            message: "Razorpay Test Mode payment signature verified. The live transaction is now available on the dashboard.",
             status: "verified_test_payment",
             event,
             verification,
@@ -189,7 +207,7 @@ export async function startCheckoutFlow(amount: number, dependencies: CheckoutFl
     },
     modal: { ondismiss: () => { void reportDismissal() } },
   })
-  checkout.on("payment.failed", () => { void reportDismissal() })
+  checkout.on("payment.failed", failure => { void reportDismissal(failure) })
   dependencies.onState({ message: "Razorpay Test Mode Checkout opened.", status: "checkout_opened", order })
   checkout.open()
 }

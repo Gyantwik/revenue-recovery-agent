@@ -7,6 +7,8 @@ import com.revenueRecovery.model.Event;
 import com.revenueRecovery.model.PolicyDecision;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RootCause;
+import com.revenueRecovery.model.enums.TransactionSource;
+import com.revenueRecovery.model.enums.VerificationResult;
 import com.revenueRecovery.repository.AuditRecordRepository;
 import org.springframework.stereotype.Service;
 
@@ -43,7 +45,21 @@ public class AuditService {
         execution.setActionTaken(policy.getActionTaken());
         execution.setMaxAttemptsAllowed(policy.getMaxAttemptsAllowed());
         execution.setStopOrEscalateReason(stopOrEscalateReason(execution, classification));
+        execution.setSource(TransactionSource.SEEDED_REFERENCE);
+        execution.setDetail("{\"classification_method\":\"" + classification.getMethod()
+                + "\",\"signals\":\"" + escape(joinSignals(event.getSignalsUsed())) + "\"}");
+        if (policy.getActionTaken() == com.revenueRecovery.model.enums.ActionTaken.VERIFY_STATUS) {
+            execution.setVerificationResult(execution.getOutcome() == Outcome.RECOVERED
+                    ? VerificationResult.CONFIRMED_SUCCESS : VerificationResult.CONFIRMED_FAILED_RETRY_BLOCKED);
+            if (execution.getOutcome() != Outcome.RECOVERED) {
+                execution.setEscalationReason("BANK_PENDING_FINAL_STATUS_UNKNOWN");
+            }
+        }
         return auditRecordRepository.save(execution);
+    }
+
+    private String escape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     public AuditRecord trackOutcome(AuditRecord auditRecord) {

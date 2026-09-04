@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { ApiError, getBatchSummary, getNextRecoveryAction, getTransaction, getTransactions, isTerminalLifecycle, triggerTransactionAction } from "./api.ts"
+import { ApiError, generateAiRecoveryMessage, getAiAnalysis, getBatchSummary, getNextRecoveryAction, getTransaction, getTransactions, isTerminalLifecycle, triggerTransactionAction } from "./api.ts"
 
 const originalFetch = globalThis.fetch
 
@@ -115,4 +115,45 @@ test("malformed next-action responses are rejected", async () => {
     action_type: "OPEN_TEST_MODE_RECOVERY_CHECKOUT",
   }), { status: 200 })
   await assert.rejects(getNextRecoveryAction("TXN10059"), /invalid next-action response/)
+})
+
+test("Gemini analysis validates and preserves the ordered five-stage trace", async () => {
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    event_id: "TXN10013",
+    predicted_root_cause: "bank_temp_error",
+    confidence: 0.94,
+    recommended_action: "retry_payment",
+    ai_explanation: "The issuer timed out.",
+    optimal_retry_timing: "Wait 15 minutes.",
+    risk_assessment: "Low duplicate debit risk.",
+    analysis_source: "gemini",
+    reasoning_trace: [
+      { stage: "OBSERVE", thought: "Timeout observed.", conclusion: "Issuer did not respond." },
+      { stage: "CLASSIFY", thought: "Matched bank timeout.", conclusion: "bank_temp_error" },
+      { stage: "DECIDE", thought: "Applied retry policy.", conclusion: "retry_payment" },
+      { stage: "GUARDRAIL_CHECK", thought: "Checked stop rules.", conclusion: "Retry is allowed." },
+      { stage: "ACT", thought: "Prepared recommendation.", conclusion: "Wait before retry." },
+    ],
+  }), { status: 200 })
+
+  const result = await getAiAnalysis("TXN10013")
+  assert.equal(result.reasoning_trace.length, 5)
+  assert.equal(result.reasoning_trace[3].stage, "GUARDRAIL_CHECK")
+})
+
+test("AI message client posts the selected channel and customer name", async () => {
+  let sentBody = ""
+  globalThis.fetch = async (_input, init) => {
+    sentBody = String(init?.body)
+    return new Response(JSON.stringify({
+      event_id: "TXN10043",
+      channel: "whatsapp",
+      subject: "Complete your payment",
+      message: "Hi Ravi, continue securely.",
+      suggested_cta: "Resume Payment Securely",
+    }), { status: 200 })
+  }
+
+  await generateAiRecoveryMessage("TXN10043", "WHATSAPP", "Ravi K.")
+  assert.deepEqual(JSON.parse(sentBody), { channel: "WHATSAPP", customerName: "Ravi K." })
 })

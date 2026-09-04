@@ -168,7 +168,7 @@ class RazorpayTestCheckoutControllerTest {
     }
 
     @Test
-    void intakeDoesNotChangeRecoveryMetricsActionsOrHistory() throws Exception {
+    void intakeCreatesOneLiveDashboardTransactionWithoutSyntheticAuditHistory() throws Exception {
         long recordsBefore = auditRecordRepository.count();
         long historyBefore = auditHistoryRepository.count();
         JsonNode summaryBefore = objectMapper.readTree(mockMvc.perform(get("/api/batch-summary"))
@@ -180,9 +180,10 @@ class RazorpayTestCheckoutControllerTest {
 
         JsonNode summaryAfter = objectMapper.readTree(mockMvc.perform(get("/api/batch-summary"))
                 .andReturn().getResponse().getContentAsString());
-        assertEquals(summaryBefore, summaryAfter);
-        assertEquals(recordsBefore, auditRecordRepository.count());
+        assertEquals(summaryBefore.get("total_cases").asLong() + 1, summaryAfter.get("total_cases").asLong());
+        assertEquals(recordsBefore + 1, auditRecordRepository.count());
         assertEquals(historyBefore, auditHistoryRepository.count());
+        assertEquals("live", auditRecordRepository.findByGatewayOrderId(ORDER_ID).orElseThrow().getSource().toJson());
     }
 
     private String successBody(String orderId) {

@@ -8,6 +8,8 @@ import com.revenueRecovery.model.enums.LifecycleState;
 import com.revenueRecovery.model.enums.ActionTaken;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RootCause;
+import com.revenueRecovery.model.enums.TransactionSource;
+import com.revenueRecovery.model.enums.VerificationResult;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -35,7 +37,15 @@ public record AuditRecordResponse(
         @JsonProperty("lifecycle_state") LifecycleState lifecycleState,
         @JsonProperty("next_eligible_action_at") Instant nextEligibleActionAt,
         @JsonProperty("recovery_window_expires_at") Instant recoveryWindowExpiresAt,
-        List<HistoryResponse> history) {
+        List<HistoryResponse> history,
+        @JsonProperty("customer_ref") String customerRef,
+        TransactionSource source,
+        @JsonProperty("verification_result") VerificationResult verificationResult,
+        String detail,
+        @JsonProperty("gateway_error_reason") String gatewayErrorReason,
+        @JsonProperty("gateway_order_id") String gatewayOrderId,
+        @JsonProperty("gateway_payment_id") String gatewayPaymentId,
+        @JsonProperty("escalation_reason") String escalationReason) {
 
     public static AuditRecordResponse from(AuditRecord record) {
         return from(record, List.of());
@@ -63,7 +73,10 @@ public record AuditRecordResponse(
                 record.getLifecycleState(),
                 record.getNextEligibleActionAt(),
                 record.getRecoveryWindowExpiresAt(),
-                history.stream().map(HistoryResponse::from).toList());
+                history.stream().map(HistoryResponse::from).toList(),
+                record.getCustomerRef(), record.getSource(), record.getVerificationResult(),
+                record.getDetail(), record.getGatewayErrorReason(), record.getGatewayOrderId(),
+                record.getGatewayPaymentId(), record.getEscalationReason());
     }
 
     private static List<String> splitSignals(String signals) {

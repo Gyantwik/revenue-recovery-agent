@@ -11,6 +11,7 @@ export function formatRecoveryRate(rate: number): string {
 }
 
 export function formatAttemptCount(attemptNumber: number, maxAttempts: number): string {
+  if (attemptNumber === 0 && maxAttempts === 0) return "N/A (Policy)"
   return `${attemptNumber}/${maxAttempts}`
 }
 

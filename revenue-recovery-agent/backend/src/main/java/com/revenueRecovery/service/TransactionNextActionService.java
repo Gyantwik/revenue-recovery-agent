@@ -9,6 +9,11 @@ import com.revenueRecovery.model.enums.NextRecoveryAction;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.repository.AuditRecordRepository;
 import com.revenueRecovery.repository.RecoveryDemoCaseRepository;
+import com.revenueRecovery.repository.PaymentReservationRepository;
+import com.revenueRecovery.model.PaymentReservation;
+import com.revenueRecovery.model.enums.ReservationStatus;
+import com.revenueRecovery.model.enums.TransactionSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,13 +22,23 @@ public class TransactionNextActionService {
     private final AuditRecordRepository auditRecordRepository;
     private final RecoveryDemoCaseRepository demoCaseRepository;
     private final RecoveryTransactionEligibilityService transactionEligibilityService;
+    private final PaymentReservationRepository reservationRepository;
 
+    @Autowired
     public TransactionNextActionService(AuditRecordRepository auditRecordRepository,
             RecoveryDemoCaseRepository demoCaseRepository,
-            RecoveryTransactionEligibilityService transactionEligibilityService) {
+            RecoveryTransactionEligibilityService transactionEligibilityService,
+            PaymentReservationRepository reservationRepository) {
         this.auditRecordRepository = auditRecordRepository;
         this.demoCaseRepository = demoCaseRepository;
         this.transactionEligibilityService = transactionEligibilityService;
+        this.reservationRepository = reservationRepository;
+    }
+
+    TransactionNextActionService(AuditRecordRepository auditRecordRepository,
+            RecoveryDemoCaseRepository demoCaseRepository,
+            RecoveryTransactionEligibilityService transactionEligibilityService) {
+        this(auditRecordRepository, demoCaseRepository, transactionEligibilityService, null);
     }
 
     /** A read may expire a stale link to prevent an unrecoverable pending state. */
@@ -43,6 +58,22 @@ public class TransactionNextActionService {
         int maximum = value(record.getMaxAttemptsAllowed());
         String lifecycle = record.getLifecycleState() == null
                 ? "not_recovered" : record.getLifecycleState().toJson();
+        if (record.getRootCause() == com.revenueRecovery.model.enums.RootCause.WEAK_NETWORK
+                && maximum > 0 && attempts < maximum && reservationRepository != null) {
+            PaymentReservation reservation = reservationRepository.findFirstByEventIdOrderByIdDesc(record.getEventId()).orElse(null);
+            if (reservation == null) return reservationDecision(record, attempts, maximum, "reservation_available",
+                    NextRecoveryAction.RESERVE_PAYMENT, NextActionType.CREATE_RESERVATION,
+                    "Reserve Payment", "Weak connection detected",
+                    "Payment can be reserved for a duplicate-safe completion check when connectivity improves.");
+            if (reservation.getStatus() == ReservationStatus.PENDING) return reservationDecision(record, attempts, maximum,
+                    "reserved_pending", NextRecoveryAction.COMPLETE_RESERVATION, NextActionType.SIMULATE_RECONNECT,
+                    "Simulate Reconnect", "Reserved (Pending)",
+                    "Reconnect completes the safe demo reservation and records the recovered result.");
+            if (reservation.getStatus() == ReservationStatus.EXPIRED_ALT_LINK_SENT) return reservationDecision(record,
+                    attempts, maximum, "reserved_expired_alt_link_sent", NextRecoveryAction.SEND_ALT_PAYMENT_LINK,
+                    NextActionType.NONE, "Alternative Link Sent", "Reserved (Expired, Alt Link Sent)",
+                    "The reservation expired and moved to the capped alternative-payment fallback.");
+        }
         RecoveryTransactionEligibilityService.RecoveryCheckoutDecision decision =
                 transactionEligibilityService.evaluate(record);
         // A resumable customer checkout is the effective current state. Reporting the
@@ -57,6 +88,18 @@ public class TransactionNextActionService {
                 decision.riskNote(), decision.actionType(), decision.secondaryActionType(),
                 decision.secondaryButtonLabel(), decision.existingLinkStatus(), decision.linkAgeMinutes(),
                 NextActionMode.RAZORPAY_TEST_RECOVERY);
+    }
+
+    private NextRecoveryActionResponse reservationDecision(AuditRecord record, int attempts, int maximum,
+            String lifecycle, NextRecoveryAction recommendation, NextActionType type, String button,
+            String title, String reason) {
+        return new NextRecoveryActionResponse(record.getEventId(), record.getOutcome(), record.getOutcome(), lifecycle,
+                attempts, maximum, type != NextActionType.NONE, recommendation, button, title, reason,
+                type == NextActionType.CREATE_RESERVATION ? "Create one 15-minute reservation."
+                        : type == NextActionType.SIMULATE_RECONNECT ? "Re-verify payment status and complete only if verified."
+                        : "Use the separate alternative-payment path.",
+                "One pending reservation per order; completion is idempotent and verification-gated.", type,
+                null, null, "none", 0, NextActionMode.RAZORPAY_TEST_RECOVERY);
     }
 
     private NextRecoveryActionResponse decideDemo(RecoveryDemoCase recoveryCase) {

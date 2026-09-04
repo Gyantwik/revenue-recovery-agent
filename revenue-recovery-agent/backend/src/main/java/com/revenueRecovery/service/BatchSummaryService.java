@@ -28,7 +28,13 @@ public class BatchSummaryService {
     public BatchSummaryResponse summarize() {
         List<AuditRecord> records = auditRecordRepository.findAll();
         BigDecimal totalAtRisk = sum(records, true);
-        BigDecimal totalRecovered = sum(records, false);
+        // Recovery KPIs measure recovery of previously at-risk revenue only. A
+        // payment that settled normally is reported separately, never as recovered.
+        BigDecimal totalRecovered = records.stream()
+                .filter(record -> Boolean.TRUE.equals(record.getIsAtRisk()))
+                .map(AuditRecord::getRecoveredAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(ZERO, BigDecimal::add);
         BigDecimal recoveryRate = totalAtRisk.signum() == 0
                 ? ZERO.setScale(4)
                 : totalRecovered.divide(totalAtRisk, 4, RoundingMode.HALF_UP);
@@ -36,6 +42,11 @@ public class BatchSummaryService {
         Map<RootCause, CauseAccumulator> byCause = new EnumMap<>(RootCause.class);
         List<BatchSummaryResponse.EscalatedSummary> escalated = new ArrayList<>();
         for (AuditRecord record : records) {
+            // Safely settled payments are not failure cases and must not be mixed
+            // into UNKNOWN / Manual Review merely because no failure cause exists.
+            if (!Boolean.TRUE.equals(record.getIsAtRisk())) {
+                continue;
+            }
             RootCause rootCause = record.getRootCause() == null ? RootCause.UNKNOWN : record.getRootCause();
             byCause.computeIfAbsent(rootCause, ignored -> new CauseAccumulator())
                     .add(record);
@@ -74,7 +85,11 @@ public class BatchSummaryService {
 
         private void add(AuditRecord record) {
             count++;
-            totalAmount = totalAmount.add(valueOrZero(record.getAmount()));
+            // Sum riskAmount when at risk so the table total matches the top KPI card exactly
+            BigDecimal effectiveRisk = (record.getIsAtRisk() != null && record.getIsAtRisk())
+                    ? (record.getRiskAmount() != null ? record.getRiskAmount() : record.getAmount())
+                    : BigDecimal.ZERO;
+            totalAmount = totalAmount.add(valueOrZero(effectiveRisk));
             recoveredAmount = recoveredAmount.add(valueOrZero(record.getRecoveredAmount()));
         }
 

@@ -8,5 +8,12 @@ public record RazorpayCheckoutEventRequest(
         @JsonProperty("razorpay_payment_id") String razorpayPaymentId,
         @JsonProperty("razorpay_signature") String razorpaySignature,
         @JsonProperty("event_type") String eventType,
-        String reason) {
+        String reason,
+        @JsonProperty("customer_ref") String customerRef,
+        @JsonProperty("error_code") String errorCode,
+        @JsonProperty("error_description") String errorDescription,
+        @JsonProperty("error_source") String errorSource,
+        @JsonProperty("error_step") String errorStep,
+        @JsonProperty("latency_ms") Long latencyMs,
+        @JsonProperty("simulated_connection") Boolean simulatedConnection) {
 }

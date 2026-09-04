@@ -3,6 +3,7 @@ export interface TransactionFilters {
   caseType: string
   rootCause: string
   outcome: string
+  source?: string
 }
 
 export interface FilterableTransaction {
@@ -10,6 +11,7 @@ export interface FilterableTransaction {
   case_type: string
   root_cause: string
   outcome: string
+  source?: string
   policy_rule_matched: string
   signals_used: string[]
 }
@@ -28,7 +30,8 @@ export function filterTransactions<T extends FilterableTransaction>(
     const matchesCaseType = filters.caseType === "all" || transaction.case_type === filters.caseType
     const matchesRootCause = filters.rootCause === "all" || transaction.root_cause === filters.rootCause
     const matchesOutcome = filters.outcome === "all" || transaction.outcome === filters.outcome
+    const matchesSource = !filters.source || filters.source === "all" || transaction.source === filters.source
 
-    return matchesSearch && matchesCaseType && matchesRootCause && matchesOutcome
+    return matchesSearch && matchesCaseType && matchesRootCause && matchesOutcome && matchesSource
   })
 }

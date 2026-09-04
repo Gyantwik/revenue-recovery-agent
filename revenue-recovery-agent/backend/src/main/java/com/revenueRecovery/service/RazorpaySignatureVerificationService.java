@@ -9,6 +9,7 @@ import com.revenueRecovery.repository.RazorpayTestCheckoutAttemptRepository;
 import com.revenueRecovery.repository.RazorpayTestOrderRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,15 +34,27 @@ public class RazorpaySignatureVerificationService {
     private final RazorpayTestOrderRepository orderRepository;
     private final RazorpayTestCheckoutAttemptRepository attemptRepository;
     private final RecoveryPaymentFinalizationService recoveryFinalizationService;
+    private final LiveTransactionService liveTransactionService;
 
+    @Autowired
     public RazorpaySignatureVerificationService(RazorpayProperties properties,
             RazorpayTestOrderRepository orderRepository,
             RazorpayTestCheckoutAttemptRepository attemptRepository,
-            RecoveryPaymentFinalizationService recoveryFinalizationService) {
+            RecoveryPaymentFinalizationService recoveryFinalizationService,
+            LiveTransactionService liveTransactionService) {
         this.properties = properties;
         this.orderRepository = orderRepository;
         this.attemptRepository = attemptRepository;
         this.recoveryFinalizationService = recoveryFinalizationService;
+        this.liveTransactionService = liveTransactionService;
+    }
+
+    // Retained for focused unit tests that exercise HMAC verification in isolation.
+    RazorpaySignatureVerificationService(RazorpayProperties properties,
+            RazorpayTestOrderRepository orderRepository,
+            RazorpayTestCheckoutAttemptRepository attemptRepository,
+            RecoveryPaymentFinalizationService recoveryFinalizationService) {
+        this(properties, orderRepository, attemptRepository, recoveryFinalizationService, null);
     }
 
     @Transactional
@@ -104,6 +117,9 @@ public class RazorpaySignatureVerificationService {
         RecoveryPaymentFinalizationService.RecoveryFinalizationResult recoveryResult =
                 recoveryFinalizationService.finalizeIfLinked(
                         order, request.razorpayPaymentId(), verifiedAt).orElse(null);
+        if (recoveryResult == null && liveTransactionService != null) {
+            liveTransactionService.markVerified(order.getRazorpayOrderId(), request.razorpayPaymentId());
+        }
         return new VerificationOutcome(HttpStatus.OK,
                 response(request, order, VERIFIED, verifiedAt, recoveryResult));
     }

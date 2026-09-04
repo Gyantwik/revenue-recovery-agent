@@ -4,6 +4,7 @@ import com.revenueRecovery.controller.dto.AuditRecordResponse;
 import com.revenueRecovery.model.AuditRecord;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RootCause;
+import com.revenueRecovery.model.enums.TransactionSource;
 import com.revenueRecovery.repository.AuditRecordRepository;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,13 +29,17 @@ public class TransactionController {
     @GetMapping
     public List<AuditRecordResponse> getTransactions(
             @RequestParam(required = false) String cause,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String source) {
         RootCause rootCause = cause == null || cause.isBlank() ? null : RootCause.fromJson(cause);
         Outcome outcome = status == null || status.isBlank() ? null : Outcome.fromJson(status);
+        TransactionSource transactionSource = source == null || source.isBlank()
+                ? null : TransactionSource.fromJson(source);
 
         return auditRecordRepository.findAll().stream()
                 .filter(record -> rootCause == null || record.getRootCause() == rootCause)
                 .filter(record -> outcome == null || record.getOutcome() == outcome)
+                .filter(record -> transactionSource == null || record.getSource() == transactionSource)
                 .map(AuditRecordResponse::from)
                 .toList();
     }
