@@ -82,7 +82,7 @@ export const ROOT_CAUSE_CONFIG: Record<RootCause, RootCauseMeta> = {
   },
   insufficient_balance: {
     label: "Insufficient Balance",
-    description: "Account has insufficient funds. Alternative instant payment link dispatched.",
+    description: "The original payment method has insufficient balance. The customer can choose another payment method using a secure recovery link.",
     color: "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800",
     badgeVariant: "outline",
     standardPolicy: "Insufficient balance → Send alternative payment link",
@@ -162,7 +162,7 @@ export const ACTION_LABELS: Record<ActionTaken, string> = {
   retry_payment: "Retry Payment",
   schedule_mandate_retry: "Schedule Mandate Retry",
   verify_status: "Verify Status",
-  send_alt_payment_link: "Send Alt Payment Link",
+  send_alt_payment_link: "Choose Another Payment Method",
   send_recovery_link: "Send Recovery Link",
   escalate_merchant: "Escalate to Merchant",
   no_action_stop: "No Action (Stop Policy)",

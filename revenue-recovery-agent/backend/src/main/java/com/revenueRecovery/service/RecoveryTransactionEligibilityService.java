@@ -107,10 +107,10 @@ public class RecoveryTransactionEligibilityService {
                     "Resume Payment", "Customer payment can be resumed",
                     "Checkout was abandoned before payment completion.");
             case INSUFFICIENT_BALANCE -> blocked(NextRecoveryAction.SEND_ALT_PAYMENT_LINK,
-                    "Alternative Payment Link Sent", "At Risk (Merchant)",
-                    "No retry of the failed funding source is allowed. A one-time customer-initiated alternative payment method is available until the recovery window expires.",
-                    "Use the separately generated alternative payment link with another method before the recovery window expires.",
-                    "No retry or recovery-payment button is offered for this cause.", NONE, 0);
+                    "Choose Another Payment Method", "Customer action required",
+                    "The original payment method has insufficient balance, so it will not be retried automatically.",
+                    "Send a secure recovery link so the customer can choose another payment method before the recovery window expires.",
+                    "No automatic retry is permitted for the failed funding source.", NONE, 0);
             case INCORRECT_PIN -> blocked(NextRecoveryAction.STOPPED_BY_POLICY,
                     "No Recovery Payment", "Authentication Failed (e.g. incorrect PIN/OTP)",
                     "This is a security-related policy stop.",

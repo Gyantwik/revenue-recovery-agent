@@ -87,7 +87,7 @@ class TransactionRecoveryCheckoutControllerTest {
         auditRepository.saveAndFlush(bank);
         assertCreated("TXN10044", 95000, "RESUME_PAYMENT");
         assertCreated("TXN10043", 315000, "RESUME_PAYMENT");
-        assertBlocked("TXN10036", "Alternative Payment Link Sent");
+        assertBlocked("TXN10036", "Choose Another Payment Method");
         assertBlocked("TXN10006", "No Recovery Payment");
         assertBlocked("TXN10014", "Retry Limit Reached");
 

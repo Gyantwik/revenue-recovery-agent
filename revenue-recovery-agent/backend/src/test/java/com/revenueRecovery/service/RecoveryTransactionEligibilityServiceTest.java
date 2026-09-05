@@ -36,7 +36,7 @@ class RecoveryTransactionEligibilityServiceTest {
         assertAllowed(RootCause.MANDATE_FAILED_RETRYABLE, Outcome.NOT_RECOVERED, 2, 2,
                 RecoveryCheckoutAction.PAY_MANUALLY, "Pay Manually");
         assertBlocked(record(RootCause.INSUFFICIENT_BALANCE, Outcome.NOT_RECOVERED, 1, 1),
-                "Alternative Payment Link Sent");
+                "Choose Another Payment Method");
         assertBlocked(record(RootCause.INCORRECT_PIN, Outcome.STOPPED_CORRECTLY, 0, 0),
                 "No Recovery Payment");
         assertBlocked(record(RootCause.BANK_TEMP_ERROR, Outcome.NOT_RECOVERED, 2, 2),
