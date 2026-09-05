@@ -93,6 +93,12 @@ export function TransactionDetailDialog({
     setRecoveryRunning(true)
     setRecoveryState(null)
     try {
+      // Razorpay Checkout is its own modal. Closing this Radix dialog first
+      // releases the focus trap and overlay, preventing Checkout from opening behind it.
+      onOpenChange(false)
+      await new Promise<void>(resolve => window.requestAnimationFrame(() =>
+        window.requestAnimationFrame(() => resolve()),
+      ))
       const started = await runRecovery.current(async () => startTransactionRecoveryFlow(
         transaction.event_id,
         {

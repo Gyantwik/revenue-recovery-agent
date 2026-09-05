@@ -27,6 +27,22 @@ export default function RazorpayTestPage() {
   const runSingleFlow = useRef(createSingleFlightRunner())
   const [selectedPreset, setSelectedPreset] = useState<DemoCardPresetId>("bank_error")
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
+  const copyMessageTimer = useRef<number | null>(null)
+
+  const selectPreset = (presetId: DemoCardPresetId) => {
+    setSelectedPreset(presetId)
+    setCopyMessage(null)
+    if (copyMessageTimer.current !== null) window.clearTimeout(copyMessageTimer.current)
+  }
+
+  const copySelectedTestCard = () => {
+    const preset = DEMO_CARD_PRESETS.find(item => item.id === selectedPreset) ?? DEMO_CARD_PRESETS[0]
+    void navigator.clipboard.writeText(preset.card).then(() => {
+      setCopyMessage("Test card copied.")
+      if (copyMessageTimer.current !== null) window.clearTimeout(copyMessageTimer.current)
+      copyMessageTimer.current = window.setTimeout(() => setCopyMessage(null), 2_000)
+    }).catch(() => setCopyMessage("Could not copy the test card. Please copy it manually."))
+  }
 
   async function createAndOpenCheckout() {
     const parsedAmount = Number(amount)
@@ -94,16 +110,13 @@ export default function RazorpayTestPage() {
             <div className="mt-3 flex flex-wrap gap-2">
               {DEMO_CARD_PRESETS.map(preset => <Button key={preset.id} type="button" size="sm"
                 variant={selectedPreset === preset.id ? "default" : "outline"}
-                onClick={() => setSelectedPreset(preset.id)}>{preset.label}</Button>)}
+                onClick={() => selectPreset(preset.id)}>{preset.label}</Button>)}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <code className="rounded bg-white px-2 py-1">{formatCardNumber(
                 (DEMO_CARD_PRESETS.find(preset => preset.id === selectedPreset) ?? DEMO_CARD_PRESETS[0]).card,
               )}</code>
-              <Button type="button" size="sm" variant="outline" onClick={() => {
-                const preset = DEMO_CARD_PRESETS.find(item => item.id === selectedPreset) ?? DEMO_CARD_PRESETS[0]
-                void navigator.clipboard.writeText(preset.card).then(() => setCopyMessage("Test card copied."))
-              }}>Copy test card</Button>
+              <Button type="button" size="sm" variant="outline" onClick={copySelectedTestCard}>Copy test card</Button>
               {copyMessage && <span role="status" className="text-xs">{copyMessage}</span>}
             </div>
           </div>

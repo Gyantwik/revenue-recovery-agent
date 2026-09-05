@@ -100,7 +100,7 @@ test("checkout page keeps recovery inside the transaction drawer", async () => {
   assert.match(recoveryPage, /Payment Failure Simulator \(Razorpay Sandbox\)/)
   assert.match(recoveryPage, /No real money is charged/)
   assert.match(drawer, /Next Recovery Decision/)
-  assert.match(dashboard, /Synthetic Benchmark — 65 seeded cases/)
+  assert.match(dashboard, /Synthetic Benchmark — 80 seeded cases/)
   assert.doesNotMatch(recoveryPage.toLowerCase(), /key_secret|razorpay_key_secret/)
   assert.doesNotMatch(recoveryPage, /razorpay_signature/)
 })
