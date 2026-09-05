@@ -64,7 +64,9 @@ public class TransactionMetadataBackfill implements ApplicationRunner {
         for (int index = 0; index < all.size(); index++) {
             AuditRecord record = all.get(index);
             if (record.getSource() == null) record.setSource(TransactionSource.SEEDED_REFERENCE);
-            applyCanonicalDemoState(record, canonicalStates.get(record.getEventId()));
+            if (!restoreVerifiedRecovery(record)) {
+                applyCanonicalDemoState(record, canonicalStates.get(record.getEventId()));
+            }
             if (record.getCustomerRef() == null || record.getCustomerRef().isBlank()) {
                 record.setCustomerRef(CUSTOMERS.get(index % CUSTOMERS.size()));
             }
@@ -135,6 +137,32 @@ public class TransactionMetadataBackfill implements ApplicationRunner {
             record.setStopOrEscalateReason(null);
             record.setEscalationReason(null);
         }
+    }
+
+    /**
+     * A backend-verified recovery is authoritative and must survive application
+     * restarts. The synthetic dataset is only a baseline; it cannot overwrite a
+     * later, cryptographically verified Razorpay Test Mode outcome.
+     */
+    private boolean restoreVerifiedRecovery(AuditRecord record) {
+        return recoveryLinks.findByEventEventId(record.getEventId())
+                .filter(link -> RecoveryPaymentFinalizationService.LINK_RECOVERED.equals(link.getStatus())
+                        || RazorpaySignatureVerificationService.VERIFIED.equals(link.getStatus()))
+                .map(link -> {
+                    BigDecimal recoveredAmount = record.getAmount() != null
+                            ? record.getAmount() : link.getAmountInr();
+                    record.setOutcome(Outcome.RECOVERED);
+                    record.setRecoveredAmount(recoveredAmount == null
+                            ? BigDecimal.ZERO.setScale(2) : recoveredAmount.setScale(2));
+                    record.setLifecycleState(LifecycleState.RECOVERED_BY_VERIFIED_TEST_PAYMENT);
+                    record.setVerificationResult(VerificationResult.CONFIRMED_SUCCESS);
+                    record.setGatewayOrderId(link.getRazorpayOrderId());
+                    record.setGatewayPaymentId(link.getRazorpayPaymentId());
+                    record.setStopOrEscalateReason(null);
+                    record.setEscalationReason(null);
+                    return true;
+                })
+                .orElse(false);
     }
 
     private String escape(String value) {

@@ -10,6 +10,7 @@ import com.revenueRecovery.model.RazorpayTestOrder;
 import com.revenueRecovery.model.TransactionRecoveryPaymentLink;
 import com.revenueRecovery.model.enums.Outcome;
 import com.revenueRecovery.model.enums.RecoveryCheckoutAction;
+import com.revenueRecovery.model.enums.VerificationResult;
 import com.revenueRecovery.repository.AuditHistoryRepository;
 import com.revenueRecovery.repository.AuditRecordRepository;
 import com.revenueRecovery.repository.EventRepository;
@@ -52,6 +53,7 @@ class TransactionRecoveryFinalizationServiceTest {
     @Autowired TransactionRecoveryPaymentLinkRepository linkRepository;
     @Autowired RazorpaySignatureVerificationService verificationService;
     @Autowired TransactionRecoveryStatusService statusService;
+    @Autowired TransactionMetadataBackfill metadataBackfill;
 
     @BeforeEach
     void seed() throws Exception {
@@ -82,6 +84,9 @@ class TransactionRecoveryFinalizationServiceTest {
         assertEquals(EVENT_ID, result.eventId());
         assertEquals(Outcome.RECOVERED, recovered.getOutcome());
         assertEquals(LifecycleState.RECOVERED_BY_VERIFIED_TEST_PAYMENT, recovered.getLifecycleState());
+        assertEquals(VerificationResult.CONFIRMED_SUCCESS, recovered.getVerificationResult());
+        assertEquals(ORDER_ID, recovered.getGatewayOrderId());
+        assertEquals("pay_txn_recovery_test", recovered.getGatewayPaymentId());
         assertEquals(0, recovered.getRecoveredAmount().compareTo(amount));
         BatchSummaryResponse summaryAfter = summaryService.summarize();
         assertEquals(0, summaryAfter.totalRecovered().compareTo(recoveredBefore.add(amount)));
@@ -91,6 +96,13 @@ class TransactionRecoveryFinalizationServiceTest {
         assertEquals(historyBefore + 1, historyRepository.countByEventId(EVENT_ID));
         assertEquals(RecoveryPaymentFinalizationService.LINK_RECOVERED,
                 linkRepository.findByEventEventId(EVENT_ID).orElseThrow().getStatus());
+
+        metadataBackfill.run(null);
+        AuditRecord afterStartupReconciliation = auditRepository.findByEventId(EVENT_ID).orElseThrow();
+        assertEquals(Outcome.RECOVERED, afterStartupReconciliation.getOutcome());
+        assertEquals(LifecycleState.RECOVERED_BY_VERIFIED_TEST_PAYMENT,
+                afterStartupReconciliation.getLifecycleState());
+        assertEquals(0, afterStartupReconciliation.getRecoveredAmount().compareTo(amount));
 
         assertThrows(RecoveryPaymentException.class, () -> finalizationService.finalizeIfLinked(
                 order, "pay_txn_recovery_test", Instant.parse("2026-09-01T10:01:00Z")));
