@@ -114,14 +114,14 @@ class TransactionRecoveryCheckoutControllerTest {
     }
 
     @Test
-    void scheduledRetryIsBlockedAndActiveLinkResumesTheSameOrder() throws Exception {
+    void bankRetryCanOpenCheckoutAndActiveLinkResumesTheSameOrder() throws Exception {
         AuditRecord bank = auditRepository.findByEventId("TXN10014").orElseThrow();
         bank.setOutcome(Outcome.NOT_RECOVERED);
         bank.setRecoveredAmount(BigDecimal.ZERO.setScale(2));
         bank.setAttemptNumber(1);
         bank.setLifecycleState(LifecycleState.RETRY_SCHEDULED);
         auditRepository.saveAndFlush(bank);
-        assertBlocked("TXN10014", "Retry Scheduled");
+        assertCreated("TXN10014", 140000, "TRY_PAYMENT_AGAIN");
 
         makeNotRecovered("TXN10044");
         String firstOrder = mockMvc.perform(post("/api/transactions/TXN10044/recovery-checkout"))

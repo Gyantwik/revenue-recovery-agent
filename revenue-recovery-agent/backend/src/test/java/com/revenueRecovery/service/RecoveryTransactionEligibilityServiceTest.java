@@ -44,8 +44,9 @@ class RecoveryTransactionEligibilityServiceTest {
     }
 
     @Test
-    void scheduledRetriesCannotCreateDuplicateCheckout() {
-        assertBlocked(record(RootCause.BANK_TEMP_ERROR, Outcome.NOT_RECOVERED, 1, 2), "Retry Scheduled");
+    void temporaryBankErrorsRemainEligibleUntilTheirRetryLimit() {
+        assertAllowed(RootCause.BANK_TEMP_ERROR, Outcome.NOT_RECOVERED, 1, 2,
+                RecoveryCheckoutAction.TRY_PAYMENT_AGAIN, "Retry Payment");
         assertBlocked(record(RootCause.MANDATE_FAILED_RETRYABLE, Outcome.NOT_RECOVERED, 1, 2),
                 "Mandate Retry Scheduled");
     }

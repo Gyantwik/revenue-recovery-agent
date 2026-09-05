@@ -121,11 +121,6 @@ public class RecoveryTransactionEligibilityService {
                             "Bank retry allowance exhausted", "The hard two-attempt ceiling has been reached.",
                             "Escalate or use a genuinely different recovery mechanism.",
                             "No further retry of the same kind is permitted.", NONE, 0)
-                    : record.getLifecycleState() == com.revenueRecovery.model.enums.LifecycleState.RETRY_SCHEDULED
-                    ? blocked(NextRecoveryAction.AWAIT_SCHEDULED_RETRY, "Retry Scheduled",
-                            "A bounded bank retry remains scheduled", "Wait for the scheduled retry to finish.",
-                            "Do not create a duplicate payment while the retry is scheduled.",
-                            "A second payment could duplicate collection.", NONE, 0)
                     : allowed(RecoveryCheckoutAction.TRY_PAYMENT_AGAIN, "Retry Payment",
                             "Temporary bank failure can be retried", "A bounded retry remains available.");
             case MANDATE_FAILED_RETRYABLE -> retryExhausted(record)
